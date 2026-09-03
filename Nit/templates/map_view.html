@@ -2787,57 +2787,57 @@ function renderBuildings(geojson) {
     // ============================================
     // FINISH DRAWING - WITH CORPORATION-BASED GIS ID
     // ============================================
-    // ============================================
-    // FINISH DRAWING - WITH AREA CALCULATION
-    // ============================================
-    function finishDrawing(event) {
-        var feature = event.feature;
-        var geometry = feature.getGeometry();
+        // ============================================
+        // FINISH DRAWING - WITH AREA CALCULATION
+        // ============================================
+        function finishDrawing(event) {
+            var feature = event.feature;
+            var geometry = feature.getGeometry();
 
-        // Get coordinates in EPSG:3857 from the map
-        var coords3857 = geometry.getCoordinates()[0];
+            // Get coordinates in EPSG:3857 from the map
+            var coords3857 = geometry.getCoordinates()[0];
 
-        // Convert map coordinates (EPSG:3857) to standard Geographic coordinates (EPSG:4326)
-        var formattedCoords = coords3857.map(function (c) {
-            return ol.proj.transform(c, 'EPSG:3857', 'EPSG:4326');
-        });
+            // Convert map coordinates (EPSG:3857) to standard Geographic coordinates (EPSG:4326)
+            var formattedCoords = coords3857.map(function (c) {
+                return ol.proj.transform(c, 'EPSG:3857', 'EPSG:4326');
+            });
 
-        // Calculate area
-        var areaSqFt = calculatePolygonArea(formattedCoords);
+            // Calculate area
+            var areaSqFt = calculatePolygonArea(formattedCoords);
 
-        // Calculate center for location detection
-        var centerLat = 0;
-        var centerLng = 0;
-        formattedCoords.forEach(function (p) {
-            centerLat += p[1];
-            centerLng += p[0];
-        });
-        centerLat = centerLat / formattedCoords.length;
-        centerLng = centerLng / formattedCoords.length;
+            // Calculate center for location detection
+            var centerLat = 0;
+            var centerLng = 0;
+            formattedCoords.forEach(function (p) {
+                centerLat += p[1];
+                centerLng += p[0];
+            });
+            centerLat = centerLat / formattedCoords.length;
+            centerLng = centerLng / formattedCoords.length;
 
-        var locationName = detectLocation(centerLat, centerLng);
-        console.log('📍 Drawing at:', locationName, 'Area:', formatArea(areaSqFt), 'Coords:', formattedCoords);
+            var locationName = detectLocation(centerLat, centerLng);
+            console.log('📍 Drawing at:', locationName, 'Area:', formatArea(areaSqFt), 'Coords:', formattedCoords);
 
-        currentPolygonCoords = formattedCoords;
+            currentPolygonCoords = formattedCoords;
 
-        map.removeInteraction(drawInteraction);
-        drawInteraction = null;
-        isDrawing = false;
+            map.removeInteraction(drawInteraction);
+            drawInteraction = null;
+            isDrawing = false;
 
-        var drawBtn = document.getElementById('drawBtn');
-        var cancelBtn = document.getElementById('cancelDrawBtn');
-        if (drawBtn) drawBtn.style.display = 'inline-flex';
-        if (cancelBtn) cancelBtn.style.display = 'none';
+            var drawBtn = document.getElementById('drawBtn');
+            var cancelBtn = document.getElementById('cancelDrawBtn');
+            if (drawBtn) drawBtn.style.display = 'inline-flex';
+            if (cancelBtn) cancelBtn.style.display = 'none';
 
-        feature.setStyle(new ol.style.Style({
-            fill: new ol.style.Fill({ color: 'rgba(16, 185, 129, 0.12)' }),
-            stroke: new ol.style.Stroke({ color: '#10b981', width: 4 })
-        }));
+            feature.setStyle(new ol.style.Style({
+                fill: new ol.style.Fill({ color: 'rgba(16, 185, 129, 0.12)' }),
+                stroke: new ol.style.Stroke({ color: '#10b981', width: 4 })
+            }));
 
-        // Open form with area pre-calculated
-        openBuildingFormModalWithArea(formattedCoords, locationName, areaSqFt);
-        showToast('✅ Polygon drawn at ' + locationName + '! Area: ' + formatArea(areaSqFt), 'success');
-    }
+            // Open form with area pre-calculated
+            openBuildingFormModalWithArea(formattedCoords, locationName, areaSqFt);
+            showToast('✅ Polygon drawn at ' + locationName + '! Area: ' + formatArea(areaSqFt), 'success');
+        }
 
     // ============================================
     // OPEN BUILDING FORM WITH AREA
@@ -4251,7 +4251,6 @@ function getCoords4326(coords) {
     window.getMapCenterLatLong = getMapCenterLatLong;
     window.formatCoordinatesForDisplay = formatCoordinatesForDisplay;
     window.parseCoordinates = parseCoordinates;
-    
     window.detectLocation = detectLocation;
     window.safeSetText = safeSetText;
     window.safeSetValue = safeSetValue;
