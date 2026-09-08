@@ -2767,3 +2767,542 @@ def bulk_import_assessment(request):
         'industrial_count': Assessment.objects.filter(property_type='industrial').count(),
     }
     return render(request, 'Nit/admin/bulk_import.html', context)
+# Nit/views.py
+import os
+import json
+import math
+from django.http import HttpResponse, JsonResponse
+from django.conf import settings
+from django.shortcuts import render
+
+
+def drone_tile(request, z, x, y):
+    """
+    Serve drone image tiles in XYZ format
+    """
+    # Path to your drone tiles - adjust based on your structure
+    # Option 1: If you have pre-generated tiles
+    tile_path = os.path.join(settings.MEDIA_ROOT, 'drone_tiles', str(z), str(x), f'{y}.jpg')
+    
+    # Option 2: If tiles are in static folder
+    # tile_path = os.path.join(settings.BASE_DIR, 'static', 'drone_tiles', str(z), str(x), f'{y}.jpg')
+    
+    # Option 3: If tiles are in a specific app folder
+    # tile_path = os.path.join(settings.BASE_DIR, 'Nit', 'static', 'drone_tiles', str(z), str(x), f'{y}.jpg')
+    
+    if os.path.exists(tile_path):
+        with open(tile_path, 'rb') as f:
+            return HttpResponse(f.read(), content_type='image/jpeg')
+    
+    # Return a transparent tile if not found
+    return HttpResponse(status=404)
+
+def list_drone_images(request):
+    """
+    List available drone images with their metadata
+    """
+    drone_data = []
+    
+    # Read from your Image folder
+    image_folder = os.path.join(settings.MEDIA_ROOT, 'Image')
+    
+    # If using static folder instead
+    # image_folder = os.path.join(settings.BASE_DIR, 'static', 'drone_images')
+    
+    if os.path.exists(image_folder):
+        for filename in os.listdir(image_folder):
+            if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.tif')):
+                # Get image extents
+                extents = get_image_extents(filename)
+                
+                drone_data.append({
+                    'name': filename,
+                    'url': f'/media/Image/{filename}',
+                    'extents': extents,
+                    'polygon': get_polygon_data(filename),
+                    'road': get_road_data(filename)
+                })
+    
+    return JsonResponse(drone_data, safe=False)
+
+def get_image_extents(filename):
+    """Get image extents from your Image Extents folder"""
+    # Try to find extents file
+    base_name = os.path.splitext(filename)[0]
+    
+    # Check for various file extensions
+    possible_extensions = ['.geojson', '.json', '.txt']
+    extents_folder = os.path.join(settings.MEDIA_ROOT, 'Image Extents')
+    
+    for ext in possible_extensions:
+        extents_file = os.path.join(extents_folder, f'{base_name}{ext}')
+        if os.path.exists(extents_file):
+            try:
+                with open(extents_file, 'r') as f:
+                    data = json.load(f)
+                    # Try to extract bounds from different formats
+                    if 'extents' in data:
+                        return data['extents']
+                    elif 'bbox' in data:
+                        return data['bbox']
+                    elif 'coordinates' in data:
+                        # Try to get from polygon coordinates
+                        coords = data['coordinates'][0]
+                        min_lat = min(c[1] for c in coords)
+                        max_lat = max(c[1] for c in coords)
+                        min_lon = min(c[0] for c in coords)
+                        max_lon = max(c[0] for c in coords)
+                        return [min_lon, min_lat, max_lon, max_lat]
+            except:
+                pass
+    
+    return [0, 0, 0, 0]  # Return default if not found
+
+def get_polygon_data(filename):
+    """Get polygon data from your Polygon folder"""
+    base_name = os.path.splitext(filename)[0]
+    polygon_folder = os.path.join(settings.MEDIA_ROOT, 'Polygon')
+    
+    possible_extensions = ['.geojson', '.json']
+    for ext in possible_extensions:
+        polygon_file = os.path.join(polygon_folder, f'{base_name}{ext}')
+        if os.path.exists(polygon_file):
+            try:
+                with open(polygon_file, 'r') as f:
+                    return json.load(f)
+            except:
+                pass
+    return None
+
+def get_road_data(filename):
+    """Get road data from your Road folder"""
+    base_name = os.path.splitext(filename)[0]
+    road_folder = os.path.join(settings.MEDIA_ROOT, 'Road')
+    
+    possible_extensions = ['.geojson', '.json']
+    for ext in possible_extensions:
+        road_file = os.path.join(road_folder, f'{base_name}{ext}')
+        if os.path.exists(road_file):
+            try:
+                with open(road_file, 'r') as f:
+                    return json.load(f)
+            except:
+                pass
+    return None
+
+import os
+import json
+from django.http import JsonResponse
+from django.conf import settings
+
+def check_drone_image(request):
+    """
+    Check if drone image exists for a ward
+    """
+    ward = request.GET.get('ward', '')
+    
+    if not ward:
+        return JsonResponse({'exists': False, 'error': 'No ward specified'})
+    
+    # Try different possible image names
+    image_folder = os.path.join(settings.MEDIA_ROOT, 'Image')
+    possible_names = [
+        f'{ward}.png',
+        f'{ward}.jpg',
+        f'{ward}.jpeg',
+        f'ward_{ward}.png',
+        f'ward_{ward}.jpg',
+        f'{ward}_drone.png',
+        f'{ward}_drone.jpg',
+    ]
+    
+    for image_name in possible_names:
+        image_path = os.path.join(image_folder, image_name)
+        if os.path.exists(image_path):
+            # Found the image!
+            base_name = os.path.splitext(image_name)[0]
+            
+            # Try to get extents
+            extents = get_extents_for_image(ward, base_name)
+            
+            return JsonResponse({
+                'exists': True,
+                'url': f'/media/Image/{image_name}',
+                'ward': ward,
+                'image_name': image_name,
+                'extents': extents or [78.1536, 11.6446, 78.1736, 11.6646]
+            })
+    
+    # No image found
+    return JsonResponse({
+        'exists': False,
+        'ward': ward,
+        'message': f'No drone image found for Ward {ward}'
+    })
+
+def get_extents_for_image(ward, base_name):
+    """
+    Get extents for a ward image from multiple sources
+    """
+    # Check .pgw file
+    pgw_path = os.path.join(settings.MEDIA_ROOT, 'Image', f'{base_name}.pgw')
+    if os.path.exists(pgw_path):
+        return read_pgw_file(pgw_path, f'{base_name}.png')
+    
+    # Check GeoJSON file
+    geojson_path = os.path.join(settings.MEDIA_ROOT, 'Image Extents', f'{base_name}.geojson')
+    if os.path.exists(geojson_path):
+        return read_geojson_extents(geojson_path)
+    
+    # Check ward-specific extents
+    ward_geojson = os.path.join(settings.MEDIA_ROOT, 'Image Extents', f'ward_{ward}.geojson')
+    if os.path.exists(ward_geojson):
+        return read_geojson_extents(ward_geojson)
+    
+    # Check if there's a generic extents file for the ward
+    extents_folder = os.path.join(settings.MEDIA_ROOT, 'Image Extents')
+    if os.path.exists(extents_folder):
+        for filename in os.listdir(extents_folder):
+            if filename.startswith(str(ward)) and filename.endswith('.geojson'):
+                return read_geojson_extents(os.path.join(extents_folder, filename))
+    
+    return None
+
+def read_pgw_file(pgw_path, image_name):
+    """Read .pgw world file and calculate image extents"""
+    try:
+        with open(pgw_path, 'r') as f:
+            lines = f.readlines()
+            if len(lines) >= 6:
+                pixel_x = float(lines[0].strip())
+                pixel_y = float(lines[3].strip())
+                upper_left_x = float(lines[4].strip())
+                upper_left_y = float(lines[5].strip())
+                
+                # Get image size
+                image_path = os.path.join(os.path.dirname(pgw_path), image_name)
+                if os.path.exists(image_path):
+                    from PIL import Image
+                    img = Image.open(image_path)
+                    width, height = img.size
+                    
+                    # Calculate extents
+                    min_x = upper_left_x
+                    max_x = upper_left_x + (width * pixel_x)
+                    min_y = upper_left_y + (height * pixel_y)
+                    max_y = upper_left_y
+                    
+                    return [min_x, min_y, max_x, max_y]
+    except Exception as e:
+        print(f"Error reading .pgw: {e}")
+    
+    return None
+
+def read_geojson_extents(geojson_path):
+    """Read extents from GeoJSON file"""
+    try:
+        with open(geojson_path, 'r') as f:
+            data = json.load(f)
+            
+            # Try different possible formats
+            if 'extents' in data:
+                return data['extents']
+            if 'bbox' in data:
+                return data['bbox']
+            if 'properties' in data and 'extents' in data['properties']:
+                return data['properties']['extents']
+            if 'geometry' in data and data['geometry']['type'] == 'Polygon':
+                coords = data['geometry']['coordinates'][0]
+                if coords and len(coords) > 0:
+                    min_lon = min(c[0] for c in coords)
+                    max_lon = max(c[0] for c in coords)
+                    min_lat = min(c[1] for c in coords)
+                    max_lat = max(c[1] for c in coords)
+                    return [min_lon, min_lat, max_lon, max_lat]
+    except Exception as e:
+        print(f"Error reading GeoJSON: {e}")
+    
+    return None
+# Nit/views.py
+import os
+import json
+import re
+from django.http import JsonResponse, HttpResponse
+from django.conf import settings
+
+def get_drone_image(request):
+    """
+    Get the current drone image info
+    This will support future multiple images
+    """
+    # Look for drone images in the media/Image folder
+    image_folder = os.path.join(settings.MEDIA_ROOT, 'Image')
+    
+    # Find all drone images
+    drone_images = []
+    
+    if os.path.exists(image_folder):
+        for filename in os.listdir(image_folder):
+            if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.tif')):
+                # Check if there's a companion .pgw file
+                base_name = os.path.splitext(filename)[0]
+                pgw_file = os.path.join(image_folder, base_name + '.pgw')
+                
+                extents = None
+                if os.path.exists(pgw_file):
+                    extents = read_pgw_file(pgw_file, filename)
+                
+                # Check for GeoJSON extents
+                if not extents:
+                    geojson_file = os.path.join(image_folder.replace('Image', 'Image Extents'), base_name + '.geojson')
+                    if os.path.exists(geojson_file):
+                        extents = read_geojson_extents(geojson_file)
+                
+                drone_images.append({
+                    'name': filename,
+                    'url': f'/media/Image/{filename}',
+                    'extents': extents,
+                    'altitude': extract_altitude(filename),
+                    'date': os.path.getmtime(os.path.join(image_folder, filename))
+                })
+    
+    if drone_images:
+        # Return the first image (you can add logic to select specific one)
+        return JsonResponse(drone_images[0])
+    
+    # Return default if no image found
+    return JsonResponse({
+        'name': 'default',
+        'url': '/media/Image/91.png',
+        'extents': [78.1536, 11.6446, 78.1736, 11.6646],
+        'altitude': 120
+    })
+
+def list_drone_images(request):
+    """
+    List all available drone images
+    """
+    image_folder = os.path.join(settings.MEDIA_ROOT, 'Image')
+    drone_images = []
+    
+    if os.path.exists(image_folder):
+        for filename in os.listdir(image_folder):
+            if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.tif')):
+                base_name = os.path.splitext(filename)[0]
+                
+                # Try to get extents from various sources
+                extents = None
+                
+                # Check .pgw file
+                pgw_file = os.path.join(image_folder, base_name + '.pgw')
+                if os.path.exists(pgw_file):
+                    extents = read_pgw_file(pgw_file, filename)
+                
+                # Check GeoJSON
+                if not extents:
+                    geojson_file = os.path.join(settings.MEDIA_ROOT, 'Image Extents', base_name + '.geojson')
+                    if os.path.exists(geojson_file):
+                        extents = read_geojson_extents(geojson_file)
+                
+                drone_images.append({
+                    'name': filename,
+                    'url': f'/media/Image/{filename}',
+                    'extents': extents,
+                    'altitude': extract_altitude(filename)
+                })
+    
+    return JsonResponse(drone_images, safe=False)
+
+def list_wards_with_drone_images(request):
+    """
+    List all wards that have drone images
+    """
+    image_folder = os.path.join(settings.MEDIA_ROOT, 'Image')
+    wards = []
+    
+    if os.path.exists(image_folder):
+        for filename in os.listdir(image_folder):
+            # Extract ward number from filename
+            # Supports: 91.png, ward_91.png, 91_drone.png, etc.
+            match = re.search(r'(\d+)\.(png|jpg|jpeg|tif)', filename, re.IGNORECASE)
+            if match:
+                ward_number = match.group(1)
+                
+                # Check if this ward already exists in list
+                existing = next((w for w in wards if w['number'] == ward_number), None)
+                
+                if existing:
+                    existing['image_count'] += 1
+                else:
+                    # Try to get extents
+                    extents = get_extents_for_ward(ward_number)
+                    
+                    wards.append({
+                        'number': ward_number,
+                        'has_drone': True,
+                        'image_count': 1,
+                        'extents': extents,
+                        'sample_image': f'/media/Image/{filename}'
+                    })
+    
+    # Sort wards by number
+    wards.sort(key=lambda x: int(x['number']))
+    
+    return JsonResponse(wards, safe=False)
+
+def check_drone_image(request):
+    """
+    Check if drone image exists for a ward
+    """
+    ward = request.GET.get('ward', '')
+    
+    if not ward:
+        return JsonResponse({'exists': False, 'error': 'No ward specified'})
+    
+    image_folder = os.path.join(settings.MEDIA_ROOT, 'Image')
+    
+    # Try different possible image names
+    possible_names = [
+        f'{ward}.png',
+        f'{ward}.jpg',
+        f'{ward}.jpeg',
+        f'ward_{ward}.png',
+        f'ward_{ward}.jpg',
+        f'{ward}_drone.png',
+        f'{ward}_drone.jpg',
+    ]
+    
+    for image_name in possible_names:
+        image_path = os.path.join(image_folder, image_name)
+        if os.path.exists(image_path):
+            base_name = os.path.splitext(image_name)[0]
+            extents = get_extents_for_ward(ward)
+            
+            return JsonResponse({
+                'exists': True,
+                'url': f'/media/Image/{image_name}',
+                'ward': ward,
+                'image_name': image_name,
+                'extents': extents or [78.1536, 11.6446, 78.1736, 11.6646]
+            })
+    
+    return JsonResponse({
+        'exists': False,
+        'ward': ward,
+        'message': f'No drone image found for Ward {ward}'
+    })
+
+def get_extents_for_ward(ward_number):
+    """
+    Get extents for a ward from various sources
+    """
+    # Check .pgw file
+    pgw_path = os.path.join(settings.MEDIA_ROOT, 'Image', f'{ward_number}.pgw')
+    if os.path.exists(pgw_path):
+        return read_pgw_file(pgw_path, f'{ward_number}.png')
+    
+    # Check GeoJSON file
+    geojson_path = os.path.join(settings.MEDIA_ROOT, 'Image Extents', f'{ward_number}.geojson')
+    if os.path.exists(geojson_path):
+        return read_geojson_extents(geojson_path)
+    
+    # Check ward-specific extents
+    ward_geojson = os.path.join(settings.MEDIA_ROOT, 'Image Extents', f'ward_{ward_number}.geojson')
+    if os.path.exists(ward_geojson):
+        return read_geojson_extents(ward_geojson)
+    
+    # Check if there's any extents file for this ward
+    extents_folder = os.path.join(settings.MEDIA_ROOT, 'Image Extents')
+    if os.path.exists(extents_folder):
+        for filename in os.listdir(extents_folder):
+            if filename.startswith(str(ward_number)) and filename.endswith('.geojson'):
+                return read_geojson_extents(os.path.join(extents_folder, filename))
+    
+    return None
+
+def read_pgw_file(pgw_path, image_name):
+    """Read .pgw world file and calculate image extents"""
+    try:
+        with open(pgw_path, 'r') as f:
+            lines = f.readlines()
+            if len(lines) >= 6:
+                pixel_x = float(lines[0].strip())
+                pixel_y = float(lines[3].strip())
+                upper_left_x = float(lines[4].strip())
+                upper_left_y = float(lines[5].strip())
+                
+                # Get image size
+                image_path = os.path.join(os.path.dirname(pgw_path), image_name)
+                if os.path.exists(image_path):
+                    from PIL import Image
+                    img = Image.open(image_path)
+                    width, height = img.size
+                    
+                    # Calculate extents
+                    min_x = upper_left_x
+                    max_x = upper_left_x + (width * pixel_x)
+                    min_y = upper_left_y + (height * pixel_y)
+                    max_y = upper_left_y
+                    
+                    return [min_x, min_y, max_x, max_y]
+    except Exception as e:
+        print(f"Error reading .pgw: {e}")
+    
+    return None
+
+def read_geojson_extents(geojson_path):
+    """Read extents from GeoJSON file"""
+    try:
+        with open(geojson_path, 'r') as f:
+            data = json.load(f)
+            
+            if 'extents' in data:
+                return data['extents']
+            if 'bbox' in data:
+                return data['bbox']
+            if 'properties' in data and 'extents' in data['properties']:
+                return data['properties']['extents']
+            if 'geometry' in data and data['geometry']['type'] == 'Polygon':
+                coords = data['geometry']['coordinates'][0]
+                if coords and len(coords) > 0:
+                    min_lon = min(c[0] for c in coords)
+                    max_lon = max(c[0] for c in coords)
+                    min_lat = min(c[1] for c in coords)
+                    max_lat = max(c[1] for c in coords)
+                    return [min_lon, min_lat, max_lon, max_lat]
+    except Exception as e:
+        print(f"Error reading GeoJSON: {e}")
+    
+    return None
+
+def extract_altitude(filename):
+    """Extract altitude from filename or metadata"""
+    import re
+    match = re.search(r'alt(\d+)', filename, re.IGNORECASE)
+    if match:
+        return int(match.group(1))
+    return 120  # Default altitude
+
+def drone_tile(request, z, x, y):
+    """
+    Serve drone image tiles in XYZ format
+    """
+    # Try multiple locations
+    possible_paths = [
+        os.path.join(settings.MEDIA_ROOT, 'drone_tiles', str(z), str(x), f'{y}.jpg'),
+        os.path.join(settings.MEDIA_ROOT, 'drone_tiles', str(z), str(x), f'{y}.png'),
+        os.path.join(settings.MEDIA_ROOT, 'Image', '91.png'),
+        os.path.join(settings.MEDIA_ROOT, 'image', '91.png'),
+    ]
+    
+    for tile_path in possible_paths:
+        if os.path.exists(tile_path):
+            try:
+                with open(tile_path, 'rb') as f:
+                    content_type = 'image/png' if tile_path.endswith('.png') else 'image/jpeg'
+                    return HttpResponse(f.read(), content_type=content_type)
+            except Exception as e:
+                print(f"Error reading {tile_path}: {e}")
+                continue
+    
+    return HttpResponse(status=404)

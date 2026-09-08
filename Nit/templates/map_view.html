@@ -92,7 +92,6 @@
     PREMIUM POLYGON STYLES - ANIMATIONS & GLOW
     ============================================ */
 
-    /* Animated dashed stroke for drawing mode */
     @keyframes dash-flow {
         to {
             stroke-dashoffset: -40;
@@ -104,7 +103,6 @@
         animation: dash-flow 1.5s linear infinite !important;
     }
 
-    /* Completed polygon with glow and hover effects */
     .polygon-completed {
         fill: rgba(16, 185, 129, 0.12) !important;
         stroke: #10b981 !important;
@@ -121,7 +119,6 @@
         filter: drop-shadow(0 8px 30px rgba(16, 185, 129, 0.4)) !important;
     }
 
-    /* Pulsing vertex points animation */
     @keyframes vertex-pulse {
         0%, 100% {
             r: 6px;
@@ -137,7 +134,6 @@
         animation: vertex-pulse 1.2s ease-in-out infinite !important;
     }
 
-    /* Polygon glow animation for selected state */
     @keyframes polygon-glow {
         0%, 100% {
             filter: drop-shadow(0 0 15px rgba(16, 185, 129, 0.2));
@@ -151,6 +147,146 @@
         animation: polygon-glow 2s ease-in-out infinite !important;
         stroke: #34d399 !important;
         stroke-width: 4px !important;
+    }
+
+    /* ============================================
+    WARD STATS STYLES
+    ============================================ */
+    .ward-stats-container {
+        padding: 0 20px 12px 20px;
+    }
+
+    .ward-stats-scroll {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding: 4px 0 8px 0;
+        scrollbar-width: thin;
+    }
+
+    .ward-stats-scroll::-webkit-scrollbar {
+        height: 4px;
+    }
+    .ward-stats-scroll::-webkit-scrollbar-track {
+        background: #e9edf2;
+        border-radius: 10px;
+    }
+    .ward-stats-scroll::-webkit-scrollbar-thumb {
+        background: #c5d0db;
+        border-radius: 10px;
+    }
+    
+    .ward-chip {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: white;
+        padding: 6px 14px 6px 10px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        border: 1px solid #eef2f6;
+        border-left: 3px solid #2ecc71;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        flex-shrink: 0;
+    }
+    
+    .ward-chip:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        border-color: #dce1e8;
+    }
+    
+    .ward-chip .ward-number {
+        font-weight: 700;
+        color: #0f3b5e;
+        font-size: 0.9rem;
+    }
+    
+    .ward-chip .ward-status {
+        font-size: 0.7rem;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-weight: 600;
+    }
+    
+    .ward-chip .ward-status.has-drone {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .ward-chip .ward-status.no-drone {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    
+    .ward-chip .drone-icon {
+        font-size: 0.9rem;
+    }
+    
+    .ward-chip.active {
+        border-left-color: #e67e22 !important;
+        background: #fef9e7;
+        border-color: #f39c12;
+    }
+
+    /* ============================================
+    DRONE GALLERY STYLES
+    ============================================ */
+    .drone-gallery-panel {
+        display: none;
+        position: fixed;
+        right: 20px;
+        top: 100px;
+        width: 320px;
+        max-height: 70vh;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        z-index: 999;
+        padding: 16px;
+        overflow-y: auto;
+    }
+
+    .drone-gallery-panel.show {
+        display: block;
+    }
+
+    .drone-thumb {
+        cursor: pointer;
+        margin-bottom: 10px;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 2px solid transparent;
+        transition: all 0.3s;
+        background: #f8f9fa;
+    }
+    
+    .drone-thumb:hover {
+        border-color: #e67e22;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    }
+    
+    .drone-thumb img {
+        width: 100%;
+        height: 150px;
+        object-fit: cover;
+        display: block;
+    }
+    
+    .drone-thumb .thumb-info {
+        padding: 8px 10px;
+        font-size: 0.8rem;
+    }
+    
+    .drone-thumb .thumb-info strong {
+        display: block;
+    }
+    
+    .drone-thumb .thumb-info small {
+        color: #666;
     }
 </style>
 {% endblock %}
@@ -219,6 +355,24 @@
 </div>
 
 <!-- ============================================
+    WARD STATS WITH DRONE INDICATOR
+    ============================================ -->
+<div class="ward-stats-container">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        <i class="fas fa-map-pin" style="color: #1a8a7a;"></i>
+        <span style="font-weight: 600; color: #2c3e50; font-size: 0.85rem;">Wards with Drone Images</span>
+        <span class="badge" style="background: #1a8a7a; color: white; padding: 2px 10px; border-radius: 12px; font-size: 0.7rem;">
+            <span id="wardCount">0</span> available
+        </span>
+    </div>
+    <div class="ward-stats-scroll" id="wardList">
+        <div style="padding: 10px 20px; color: #999; font-size: 0.85rem;">
+            <i class="fas fa-spinner fa-spin"></i> Loading wards...
+        </div>
+    </div>
+</div>
+
+<!-- ============================================
     MAP TOOLBAR
     ============================================ -->
 <div class="map-toolbar">
@@ -230,6 +384,7 @@
                 <option value="osm">🗺️ Street</option>
                 <option value="dark">🌙 Dark</option>
                 <option value="light">☀️ Light</option>
+                <option value="drone">✈️ Drone View</option>
             </select>
         </div>
     </div>
@@ -260,6 +415,9 @@
         </button>
         <button onclick="trackMe()" class="toolbar-btn btn-track">
             <i class="fas fa-location-dot"></i> Track Me
+        </button>
+        <button onclick="toggleDroneGallery()" class="toolbar-btn" style="background: linear-gradient(135deg, #e67e22, #f39c12); color: white;">
+            <i class="fas fa-images"></i> Drone Gallery
         </button>
         <style>
             .btn-track {
@@ -309,7 +467,6 @@
     ============================================ -->
 <div class="map-wrapper">
     <div id="map"></div>
-    <!-- Coordinate Display Overlay -->
     <div id="coordinate-display">
         <span class="coord-label">📍</span>
         <span class="coord-value" id="hoverLat">--</span>
@@ -321,6 +478,21 @@
     </div>
     <div class="map-watermark">
         <span>GIS Survey</span>
+    </div>
+</div>
+
+<!-- ============================================
+    DRONE GALLERY PANEL
+    ============================================ -->
+<div id="droneGallery" class="drone-gallery-panel">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h4 style="margin:0;"><i class="fas fa-drone" style="color:#e67e22;"></i> Drone Images</h4>
+        <button onclick="document.getElementById('droneGallery').classList.remove('show')" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">&times;</button>
+    </div>
+    <div id="droneImageList">
+        <div style="text-align:center; color:#999; padding:20px;">
+            <i class="fas fa-spinner fa-spin"></i> Loading...
+        </div>
     </div>
 </div>
 
@@ -357,7 +529,6 @@
                     </div>
 
                     <div class="form-grid-2col">
-                        <!-- LEFT COLUMN -->
                         <div class="form-column">
                             <fieldset class="form-section">
                                 <legend class="section-legend">
@@ -410,7 +581,6 @@
                             </fieldset>
                         </div>
 
-                        <!-- RIGHT COLUMN -->
                         <div class="form-column">
                             <fieldset class="form-section">
                                 <legend class="section-legend">
@@ -463,7 +633,6 @@
                         </div>
                     </div>
 
-                    <!-- FULL WIDTH: Geometry Section -->
                     <fieldset class="form-section full-width-section">
                         <legend class="section-legend">
                             <i class="fas fa-draw-polygon"></i> Polygon Coordinates
@@ -581,9 +750,6 @@
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 
 <style>
-    /* ============================================
-    PREMIUM DESIGN - OPENLAYERS MAP
-    ============================================ */
     :root {
         --primary: #0f3b5e;
         --primary-light: #1a5276;
@@ -919,7 +1085,6 @@
         display: none !important;
     }
 
-    /* Modal Styling */
     .modal {
         display: none;
         position: fixed;
@@ -1278,6 +1443,10 @@
     var watchId = null;
     var isTracking = false;
     var currentPosition = null;
+    var currentDroneLayer = null;
+    var droneImageData = null;
+    var availableWards = [];
+    var currentSelectedWard = null;
 
     // ============================================
     // CSRF TOKEN
@@ -1382,38 +1551,35 @@
         return normalized;
     }
 
-  function parseCoordinates(text) {
-    if (!text || typeof text !== 'string') return null;
-    
-    var lines = text.trim().split('\n');
-    var storageCoords = [];
-    
-    for (var i = 0; i < lines.length; i++) {
-        var line = lines[i].trim();
-        if (line === '') continue;
+    function parseCoordinates(text) {
+        if (!text || typeof text !== 'string') return null;
         
-        var parts = line.split(',');
-        if (parts.length === 2) {
-            var val1 = parseFloat(parts[0].trim());
-            var val2 = parseFloat(parts[1].trim());
+        var lines = text.trim().split('\n');
+        var storageCoords = [];
+        
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim();
+            if (line === '') continue;
             
-            if (!isNaN(val1) && !isNaN(val2)) {
-                // Check if coordinates are in EPSG:3857 (large numbers)
-                if (Math.abs(val1) > 100000 && Math.abs(val2) > 100000) {
-                    // Convert from EPSG:3857 to EPSG:4326
-                    // Note: The input format is lat,lng but stored as x,y in 3857
-                    var converted = ol.proj.transform([val2, val1], 'EPSG:3857', 'EPSG:4326');
-                    storageCoords.push([converted[0], converted[1]]);
-                } else {
-                    // Already in EPSG:4326 - store as [lng, lat]
-                    storageCoords.push([val2, val1]);
+            var parts = line.split(',');
+            if (parts.length === 2) {
+                var val1 = parseFloat(parts[0].trim());
+                var val2 = parseFloat(parts[1].trim());
+                
+                if (!isNaN(val1) && !isNaN(val2)) {
+                    if (Math.abs(val1) > 100000 && Math.abs(val2) > 100000) {
+                        var converted = ol.proj.transform([val2, val1], 'EPSG:3857', 'EPSG:4326');
+                        storageCoords.push([converted[0], converted[1]]);
+                    } else {
+                        storageCoords.push([val2, val1]);
+                    }
                 }
             }
         }
+        
+        return storageCoords.length > 0 ? storageCoords : null;
     }
-    
-    return storageCoords.length > 0 ? storageCoords : null;
-}
+
     function formatCoordinatesForDisplay(coords) {
         if (!coords || !Array.isArray(coords) || coords.length === 0) {
             return '';
@@ -1476,70 +1642,424 @@
     // ============================================
     // CHANGE MAP LAYER
     // ============================================
-    function changeMapLayer() {
-        if (!map) return;
-        var type = document.getElementById('mapLayer').value;
-        var layers = map.getLayers();
-        var toRemove = [];
-        layers.forEach(function (layer) {
-            if (layer instanceof ol.layer.Tile) {
-                toRemove.push(layer);
-            }
-        });
-        toRemove.forEach(function (layer) {
-            map.removeLayer(layer);
-        });
-        var source;
-        switch (type) {
-            case 'satellite':
-                source = new ol.source.XYZ({
+   function changeMapLayer() {
+    if (!map) return;
+    var type = document.getElementById('mapLayer').value;
+    var layers = map.getLayers();
+    var toRemove = [];
+    
+    layers.forEach(function (layer) {
+        if (layer instanceof ol.layer.Tile || layer instanceof ol.layer.Image) {
+            toRemove.push(layer);
+        }
+    });
+    toRemove.forEach(function (layer) {
+        map.removeLayer(layer);
+    });
+    
+    var baseLayer;
+    switch (type) {
+        case 'satellite':
+            baseLayer = new ol.layer.Tile({
+                source: new ol.source.XYZ({
                     url: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
                     maxZoom: 20
-                });
-                break;
-            case 'dark':
-                source = new ol.source.XYZ({
+                }),
+                zIndex: 0
+            });
+            map.addLayer(baseLayer);
+            break;
+        case 'dark':
+            baseLayer = new ol.layer.Tile({
+                source: new ol.source.XYZ({
                     url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
                     maxZoom: 19,
                     subdomains: ['a', 'b', 'c', 'd']
-                });
-                break;
-            case 'light':
-                source = new ol.source.OSM({
+                }),
+                zIndex: 0
+            });
+            map.addLayer(baseLayer);
+            break;
+        case 'light':
+            baseLayer = new ol.layer.Tile({
+                source: new ol.source.OSM({
                     maxZoom: 19
-                });
-                break;
-            default:
-                source = new ol.source.OSM({
+                }),
+                zIndex: 0
+            });
+            map.addLayer(baseLayer);
+            break;
+        case 'drone':
+            // Load drone image
+            loadDroneImage();
+            break;
+        default:
+            baseLayer = new ol.layer.Tile({
+                source: new ol.source.OSM({
                     maxZoom: 19
-                });
+                }),
+                zIndex: 0
+            });
+            map.addLayer(baseLayer);
+    }
+    
+    // Re-add vector layer on top
+    if (vectorLayer) {
+        map.removeLayer(vectorLayer);
+        vectorLayer.setZIndex(1);
+        map.addLayer(vectorLayer);
+    }
+    
+    map.render();
+    
+    var layerNames = {
+        'satellite': '🛰️ Satellite View',
+        'osm': '🗺️ Street View',
+        'dark': '🌙 Dark Mode',
+        'light': '☀️ Light Mode',
+        'drone': '✈️ Drone View'
+    };
+    showToast('Switched to ' + (layerNames[type] || type), 'info');
+}
+    // ============================================
+    // DRONE IMAGE FUNCTIONS
+    // ============================================
+    function loadDroneImage() {
+        if (droneImageData) {
+            displayDroneImage(droneImageData);
+            return;
         }
-        var tileLayer = new ol.layer.Tile({
-            source: source,
-            zIndex: 0
+        
+        showToast('Loading drone image...', 'info');
+        
+        fetch('/get-drone-image/')
+            .then(function(response) { 
+                if (!response.ok) throw new Error('Failed to load drone data');
+                return response.json(); 
+            })
+            .then(function(data) {
+                droneImageData = data;
+                displayDroneImage(data);
+            })
+            .catch(function(error) {
+                console.error('Error loading drone image:', error);
+                showToast('❌ No drone image available', 'error');
+                document.getElementById('mapLayer').value = 'satellite';
+                changeMapLayer();
+            });
+    }
+
+    function displayDroneImage(data) {
+        if (currentDroneLayer) {
+            map.removeLayer(currentDroneLayer);
+            currentDroneLayer = null;
+        }
+        
+        var extents = data.extents || [78.1536, 11.6446, 78.1736, 11.6646];
+        var min3857 = ol.proj.transform([extents[0], extents[1]], 'EPSG:4326', 'EPSG:3857');
+        var max3857 = ol.proj.transform([extents[2], extents[3]], 'EPSG:4326', 'EPSG:3857');
+        var imageExtent = [min3857[0], min3857[1], max3857[0], max3857[1]];
+        
+        currentDroneLayer = new ol.layer.Image({
+            source: new ol.source.ImageStatic({
+                url: data.url || '/media/Image/91.png',
+                imageExtent: imageExtent,
+                projection: 'EPSG:3857'
+            }),
+            zIndex: 0,
+            name: 'droneLayer',
+            opacity: 1.0
         });
-        map.addLayer(tileLayer);
+        
+        map.addLayer(currentDroneLayer);
+        
         if (vectorLayer) {
             map.removeLayer(vectorLayer);
             vectorLayer.setZIndex(1);
             map.addLayer(vectorLayer);
         }
-        map.render();
-        console.log('✅ Layer changed to:', type);
+        
+        map.getView().fit(imageExtent, {
+            padding: [50, 50, 50, 50],
+            maxZoom: 19,
+            duration: 1000
+        });
+        
+        var info = data.name || '91.png';
+        if (data.altitude) {
+            info += ' (Altitude: ' + data.altitude + 'm)';
+        }
+        showToast('✈️ Drone view: ' + info, 'success');
+    }
+
+    // ============================================
+    // WARD FUNCTIONS
+    // ============================================
+    function loadWards() {
+        var wardList = document.getElementById('wardList');
+        
+        fetch('/list-wards-with-drone-images/')
+            .then(function(response) { 
+                if (!response.ok) throw new Error('Failed to load wards');
+                return response.json(); 
+            })
+            .then(function(data) {
+                availableWards = data;
+                renderWards(data);
+                document.getElementById('wardCount').textContent = data.length;
+            })
+            .catch(function(error) {
+                console.error('Error loading wards:', error);
+                wardList.innerHTML = `
+                    <div style="padding: 10px 20px; color: #e74c3c; font-size: 0.85rem;">
+                        <i class="fas fa-exclamation-circle"></i> Error loading wards
+                    </div>
+                `;
+            });
+    }
+
+    function renderWards(wards) {
+        var wardList = document.getElementById('wardList');
+        
+        if (!wards || wards.length === 0) {
+            wardList.innerHTML = `
+                <div style="padding: 10px 20px; color: #999; font-size: 0.85rem;">
+                    <i class="fas fa-info-circle"></i> No drone images found
+                </div>
+            `;
+            return;
+        }
+        
+        var html = '';
+        wards.forEach(function(ward) {
+            var hasDrone = ward.has_drone;
+            var statusClass = hasDrone ? 'has-drone' : 'no-drone';
+            var statusText = hasDrone ? '✈️ Drone' : 'No Drone';
+            var borderColor = hasDrone ? '#2ecc71' : '#e74c3c';
+            
+            html += `
+                <div class="ward-chip" onclick="selectWard('${ward.number}')" 
+                     data-ward="${ward.number}"
+                     style="border-left-color: ${borderColor};">
+                    <span class="ward-number">#${ward.number}</span>
+                    <span class="ward-status ${statusClass}">${statusText}</span>
+                    ${hasDrone ? `<span class="drone-icon">🛸</span>` : ''}
+                    ${ward.image_count ? `<span class="chip-count">${ward.image_count}</span>` : ''}
+                </div>
+            `;
+        });
+        
+        wardList.innerHTML = html;
+    }
+
+    function selectWard(wardNumber) {
+        document.querySelectorAll('.ward-chip').forEach(function(chip) {
+            chip.classList.remove('active');
+        });
+        
+        document.querySelectorAll('.ward-chip').forEach(function(chip) {
+            if (chip.dataset.ward === wardNumber) {
+                chip.classList.add('active');
+            }
+        });
+        
+        currentSelectedWard = wardNumber;
+        
+        fetch('/check-drone-image/?ward=' + wardNumber)
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                if (data.exists) {
+                    showDroneImageForWard(data);
+                    document.getElementById('mapLayer').value = 'drone';
+                    showToast('✈️ Showing Ward ' + wardNumber + ' drone view', 'success');
+                } else {
+                    showToast('📷 No drone image available for Ward ' + wardNumber, 'warning');
+                    document.getElementById('mapLayer').value = 'satellite';
+                    changeMapLayer();
+                }
+            })
+            .catch(function(error) {
+                console.error('Error:', error);
+                showToast('Error loading ward data', 'error');
+            });
+    }
+
+    function showDroneImageForWard(data) {
+        if (currentDroneLayer) {
+            map.removeLayer(currentDroneLayer);
+            currentDroneLayer = null;
+        }
+        
+        var extents = data.extents || [78.1536, 11.6446, 78.1736, 11.6646];
+        var min3857 = ol.proj.transform([extents[0], extents[1]], 'EPSG:4326', 'EPSG:3857');
+        var max3857 = ol.proj.transform([extents[2], extents[3]], 'EPSG:4326', 'EPSG:3857');
+        
+        currentDroneLayer = new ol.layer.Image({
+            source: new ol.source.ImageStatic({
+                url: data.url,
+                imageExtent: [min3857[0], min3857[1], max3857[0], max3857[1]],
+                projection: 'EPSG:3857'
+            }),
+            zIndex: 0,
+            name: 'droneLayer',
+            opacity: 0.9
+        });
+        
+        map.addLayer(currentDroneLayer);
+        
+        if (vectorLayer) {
+            map.removeLayer(vectorLayer);
+            vectorLayer.setZIndex(1);
+            map.addLayer(vectorLayer);
+        }
+        
+        map.getView().fit([min3857[0], min3857[1], max3857[0], max3857[1]], {
+            padding: [50, 50, 50, 50],
+            maxZoom: 19,
+            duration: 1000
+        });
+        
+        document.getElementById('mapLayer').value = 'drone';
+    }
+
+    // ============================================
+    // DRONE GALLERY FUNCTIONS
+    // ============================================
+    function toggleDroneGallery() {
+        var gallery = document.getElementById('droneGallery');
+        if (gallery.classList.contains('show')) {
+            gallery.classList.remove('show');
+        } else {
+            gallery.classList.add('show');
+            loadDroneImages();
+        }
+    }
+
+    function loadDroneImage() {
+    if (droneImageData) {
+        displayDroneImage(droneImageData);
+        return;
+    }
+    
+    showToast('Loading drone image...', 'info');
+    
+    fetch('/get-drone-image/')
+        .then(function(response) { 
+            if (!response.ok) throw new Error('Failed to load drone data');
+            return response.json(); 
+        })
+        .then(function(data) {
+            droneImageData = data;
+            displayDroneImage(data);
+        })
+        .catch(function(error) {
+            console.error('Error loading drone image:', error);
+            showToast('❌ No drone image available', 'error');
+            document.getElementById('mapLayer').value = 'satellite';
+            changeMapLayer();
+        });
+}
+function displayDroneImage(data) {
+    if (currentDroneLayer) {
+        map.removeLayer(currentDroneLayer);
+        currentDroneLayer = null;
+    }
+    
+    var extents = data.extents || [78.1536, 11.6446, 78.1736, 11.6646];
+    var min3857 = ol.proj.transform([extents[0], extents[1]], 'EPSG:4326', 'EPSG:3857');
+    var max3857 = ol.proj.transform([extents[2], extents[3]], 'EPSG:4326', 'EPSG:3857');
+    var imageExtent = [min3857[0], min3857[1], max3857[0], max3857[1]];
+    
+    currentDroneLayer = new ol.layer.Image({
+        source: new ol.source.ImageStatic({
+            url: data.url || '/media/Image/91.png',
+            imageExtent: imageExtent,
+            projection: 'EPSG:3857'
+        }),
+        zIndex: 0,
+        name: 'droneLayer',
+        opacity: 1.0
+    });
+    
+    map.addLayer(currentDroneLayer);
+    
+    if (vectorLayer) {
+        map.removeLayer(vectorLayer);
+        vectorLayer.setZIndex(1);
+        map.addLayer(vectorLayer);
+    }
+    
+    map.getView().fit(imageExtent, {
+        padding: [50, 50, 50, 50],
+        maxZoom: 19,
+        duration: 1000
+    });
+    
+    var info = data.name || '91.png';
+    if (data.altitude) {
+        info += ' (Altitude: ' + data.altitude + 'm)';
+    }
+    showToast('✈️ Drone view: ' + info, 'success');
+}
+
+    function showDroneImageOnMap(imageUrl, extents, name) {
+        document.getElementById('droneGallery').classList.remove('show');
+        
+        if (!extents || extents.length !== 4) {
+            showToast('⚠️ Image has no extents data', 'warning');
+            return;
+        }
+        
+        document.getElementById('mapLayer').value = 'drone';
+        
+        if (currentDroneLayer) {
+            map.removeLayer(currentDroneLayer);
+            currentDroneLayer = null;
+        }
+        
+        var min3857 = ol.proj.transform([extents[0], extents[1]], 'EPSG:4326', 'EPSG:3857');
+        var max3857 = ol.proj.transform([extents[2], extents[3]], 'EPSG:4326', 'EPSG:3857');
+        
+        currentDroneLayer = new ol.layer.Image({
+            source: new ol.source.ImageStatic({
+                url: imageUrl,
+                imageExtent: [min3857[0], min3857[1], max3857[0], max3857[1]],
+                projection: 'EPSG:3857'
+            }),
+            zIndex: 0,
+            name: 'droneLayer',
+            opacity: 0.9
+        });
+        
+        map.addLayer(currentDroneLayer);
+        
+        if (vectorLayer) {
+            map.removeLayer(vectorLayer);
+            vectorLayer.setZIndex(1);
+            map.addLayer(vectorLayer);
+        }
+        
+        map.getView().fit([min3857[0], min3857[1], max3857[0], max3857[1]], {
+            padding: [50, 50, 50, 50],
+            maxZoom: 19,
+            duration: 1000
+        });
+        
+        showToast('✈️ Showing: ' + name, 'success');
     }
 
     // ============================================
     // RESET MAP VIEW
     // ============================================
-    function resetMapView() {
-        if (!map) return;
-        document.getElementById('mapLayer').value = 'satellite';
-        changeMapLayer();
-        var center3857 = ol.proj.transform([78.1636, 11.6546], 'EPSG:4326', 'EPSG:3857');
-        map.getView().setCenter(center3857);
-        map.getView().setZoom(16);
-        showToast('📍 Map view reset', 'info');
-    }
+function resetMapView() {
+    if (!map) return;
+    document.getElementById('mapLayer').value = 'satellite';
+    changeMapLayer();
+    var center3857 = ol.proj.transform([78.1636, 11.6546], 'EPSG:4326', 'EPSG:3857');
+    map.getView().setCenter(center3857);
+    map.getView().setZoom(16);
+    showToast('📍 Map view reset', 'info');
+}
 
     // ============================================
     // REFRESH DATA
@@ -1547,6 +2067,7 @@
     function refreshData() {
         showToast('Refreshing...', 'info');
         loadBuildings();
+        loadWards();
     }
 
     // ============================================
@@ -1793,104 +2314,19 @@
     // ============================================
     // RENDER BUILDINGS
     // ============================================
- function renderBuildings(geojson) {
-    if (!geojson || !geojson.features || !vectorSource) {
-        console.warn('No GeoJSON data or vectorSource not ready');
-        return;
-    }
-    console.log('📊 Rendering ' + geojson.features.length + ' buildings');
-    vectorSource.clear();
-    
-    // Normalize the GeoJSON - convert EPSG:3857 to EPSG:4326 if needed
-    var normalizedGeoJSON = JSON.parse(JSON.stringify(geojson));
-    
-    normalizedGeoJSON.features.forEach(function (feature) {
-        if (!feature.geometry || !feature.geometry.coordinates) return;
-        
-        // Check if coordinates are in EPSG:3857 (large numbers)
-        var coords = feature.geometry.coordinates[0];
-        if (coords && coords.length > 0 && Math.abs(coords[0][0]) > 100000) {
-            // Convert from EPSG:3857 to EPSG:4326
-            feature.geometry.coordinates[0] = coords.map(function(coord) {
-                var converted = ol.proj.transform(coord, 'EPSG:3857', 'EPSG:4326');
-                return converted;
-            });
+    function renderBuildings(geojson) {
+        if (!geojson || !geojson.features || !vectorSource) {
+            console.warn('No GeoJSON data or vectorSource not ready');
+            return;
         }
-    });
-    
-    var format = new ol.format.GeoJSON();
-    var features;
-    try {
-        features = format.readFeatures(normalizedGeoJSON, {
-            dataProjection: 'EPSG:4326',
-            featureProjection: 'EPSG:3857'
-        });
-    } catch (e) {
-        console.error('❌ Error reading GeoJSON:', e);
-        return;
-    }
-    
-    if (!features || features.length === 0) {
-        console.warn('No features found in GeoJSON');
-        return;
-    }
-    
-    features.forEach(function (feature) {
-        var props = feature.getProperties();
-        var geom = feature.getGeometry();
-        if (!geom) return;
+        console.log('📊 Rendering ' + geojson.features.length + ' buildings');
+        vectorSource.clear();
         
-        var color = getCorporationColor(props.corporation || '');
-        var style = new ol.style.Style({
-            fill: new ol.style.Fill({
-                color: color + '33'
-            }),
-            stroke: new ol.style.Stroke({
-                color: color,
-                width: 3
-            }),
-            zIndex: 1
-        });
-        feature.setStyle(style);
-        feature.set('buildingId', props.id || props.OBJECTID || props.GIS_ID);
-        feature.set('gisId', props.gis_id || props.GIS_ID);
-        feature.set('buildingName', props.building_name || props.name || 'Unnamed');
-        feature.set('corporation', props.corporation || 'Unknown');
-        feature.set('area', props.area || props.sqft || 0);
-        feature.set('buildingType', props.building_type || 'Other');
-    });
-    
-    vectorSource.addFeatures(features);
-    
-    var hasSavedPosition = window.mapRestorePosition && window.mapRestorePosition.lat && window.mapRestorePosition.lng;
-    if (!hasSavedPosition) {
-        try {
-            var extent = vectorSource.getExtent();
-            if (extent && !ol.extent.isEmpty(extent)) {
-                map.getView().fit(extent, {
-                    padding: [80, 80, 80, 80],
-                    maxZoom: 19,
-                    duration: 800
-                });
-                console.log('✅ Map fitted to building extent');
-            }
-        } catch (e) {
-            console.error('❌ Error fitting map to buildings:', e);
-        }
-    }
-}
-
-    function renderBuildingsWithoutFit(geojson) {
-    if (!geojson || !geojson.features || !vectorSource) {
-        return;
-    }
-    vectorSource.clear();
-    
-    var fixedGeoJSON = JSON.parse(JSON.stringify(geojson));
-    
-    // Normalize coordinates - convert EPSG:3857 to EPSG:4326
-    fixedGeoJSON.features.forEach(function (feature) {
-        if (feature.geometry && feature.geometry.coordinates) {
+        var normalizedGeoJSON = JSON.parse(JSON.stringify(geojson));
+        
+        normalizedGeoJSON.features.forEach(function (feature) {
+            if (!feature.geometry || !feature.geometry.coordinates) return;
+            
             var coords = feature.geometry.coordinates[0];
             if (coords && coords.length > 0 && Math.abs(coords[0][0]) > 100000) {
                 feature.geometry.coordinates[0] = coords.map(function(coord) {
@@ -1898,41 +2334,123 @@
                     return converted;
                 });
             }
+        });
+        
+        var format = new ol.format.GeoJSON();
+        var features;
+        try {
+            features = format.readFeatures(normalizedGeoJSON, {
+                dataProjection: 'EPSG:4326',
+                featureProjection: 'EPSG:3857'
+            });
+        } catch (e) {
+            console.error('❌ Error reading GeoJSON:', e);
+            return;
         }
-    });
-    
-    var format = new ol.format.GeoJSON();
-    var features = format.readFeatures(fixedGeoJSON, {
-        dataProjection: 'EPSG:4326',
-        featureProjection: 'EPSG:3857'
-    });
-    
-    features.forEach(function (feature) {
-        var props = feature.getProperties();
-        var color = getCorporationColor(props.corporation || '');
-        feature.setStyle(
-            new ol.style.Style({
+        
+        if (!features || features.length === 0) {
+            console.warn('No features found in GeoJSON');
+            return;
+        }
+        
+        features.forEach(function (feature) {
+            var props = feature.getProperties();
+            var geom = feature.getGeometry();
+            if (!geom) return;
+            
+            var color = getCorporationColor(props.corporation || '');
+            var style = new ol.style.Style({
                 fill: new ol.style.Fill({
                     color: color + '33'
                 }),
                 stroke: new ol.style.Stroke({
                     color: color,
                     width: 3
+                }),
+                zIndex: 1
+            });
+            feature.setStyle(style);
+            feature.set('buildingId', props.id || props.OBJECTID || props.GIS_ID);
+            feature.set('gisId', props.gis_id || props.GIS_ID);
+            feature.set('buildingName', props.building_name || props.name || 'Unnamed');
+            feature.set('corporation', props.corporation || 'Unknown');
+            feature.set('area', props.area || props.sqft || 0);
+            feature.set('buildingType', props.building_type || 'Other');
+        });
+        
+        vectorSource.addFeatures(features);
+        
+        var hasSavedPosition = window.mapRestorePosition && window.mapRestorePosition.lat && window.mapRestorePosition.lng;
+        if (!hasSavedPosition) {
+            try {
+                var extent = vectorSource.getExtent();
+                if (extent && !ol.extent.isEmpty(extent)) {
+                    map.getView().fit(extent, {
+                        padding: [80, 80, 80, 80],
+                        maxZoom: 19,
+                        duration: 800
+                    });
+                    console.log('✅ Map fitted to building extent');
+                }
+            } catch (e) {
+                console.error('❌ Error fitting map to buildings:', e);
+            }
+        }
+    }
+
+    function renderBuildingsWithoutFit(geojson) {
+        if (!geojson || !geojson.features || !vectorSource) {
+            return;
+        }
+        vectorSource.clear();
+        
+        var fixedGeoJSON = JSON.parse(JSON.stringify(geojson));
+        
+        fixedGeoJSON.features.forEach(function (feature) {
+            if (feature.geometry && feature.geometry.coordinates) {
+                var coords = feature.geometry.coordinates[0];
+                if (coords && coords.length > 0 && Math.abs(coords[0][0]) > 100000) {
+                    feature.geometry.coordinates[0] = coords.map(function(coord) {
+                        var converted = ol.proj.transform(coord, 'EPSG:3857', 'EPSG:4326');
+                        return converted;
+                    });
+                }
+            }
+        });
+        
+        var format = new ol.format.GeoJSON();
+        var features = format.readFeatures(fixedGeoJSON, {
+            dataProjection: 'EPSG:4326',
+            featureProjection: 'EPSG:3857'
+        });
+        
+        features.forEach(function (feature) {
+            var props = feature.getProperties();
+            var color = getCorporationColor(props.corporation || '');
+            feature.setStyle(
+                new ol.style.Style({
+                    fill: new ol.style.Fill({
+                        color: color + '33'
+                    }),
+                    stroke: new ol.style.Stroke({
+                        color: color,
+                        width: 3
+                    })
                 })
-            })
-        );
-        feature.set('buildingId', props.id || props.OBJECTID || props.GIS_ID);
-        feature.set('gisId', props.gis_id || props.GIS_ID);
-        feature.set('buildingName', props.building_name || props.name || 'Unnamed');
-        feature.set('corporation', props.corporation || 'Unknown');
-        feature.set('area', props.area || props.sqft || 0);
-        feature.set('buildingType', props.building_type || 'Other');
-    });
-    
-    vectorSource.addFeatures(features);
-    map.render();
-    console.log('✅ Rendered ' + features.length + ' buildings without fit');
-}
+            );
+            feature.set('buildingId', props.id || props.OBJECTID || props.GIS_ID);
+            feature.set('gisId', props.gis_id || props.GIS_ID);
+            feature.set('buildingName', props.building_name || props.name || 'Unnamed');
+            feature.set('corporation', props.corporation || 'Unknown');
+            feature.set('area', props.area || props.sqft || 0);
+            feature.set('buildingType', props.building_type || 'Other');
+        });
+        
+        vectorSource.addFeatures(features);
+        map.render();
+        console.log('✅ Rendered ' + features.length + ' buildings without fit');
+    }
+
     // ============================================
     // PREMIUM DRAWING FUNCTIONS
     // ============================================
@@ -2009,7 +2527,7 @@
     }
 
     // ============================================
-    // FINISH DRAWING - PREMIUM VERSION
+    // FINISH DRAWING
     // ============================================
     function finishDrawing(event) {
         var feature = event.feature;
@@ -2487,91 +3005,89 @@
     // ============================================
     // LOAD BUILDING FOR EDIT
     // ============================================
-function loadBuildingForEdit(id) {
-    console.log('Loading building for edit:', id);
-    showToast('Loading building data...', 'info');
-    fetch('/api/buildings/' + id + '/')
-        .then(function (response) {
-            if (!response.ok) throw new Error('Building not found');
-            return response.json();
-        })
-        .then(function (data) {
-            console.log('Building data loaded:', data);
-            safeSetText('modalTitle', '✏️ Edit Building');
-            safeSetText('modalSubtitle', 'Update building information');
-            safeSetText('displayBuildingId', '#' + data.id + ' - ' + (data.gis_id || 'N/A'));
-            safeSetValue('buildingId', data.id);
-            safeSetValue('gisId', data.gis_id || '');
-            safeSetValue('buildingName', data.building_name || '');
-            safeSetValue('buildingType', data.building_type || 'OTHER');
-            safeSetValue('floors', data.floors || '');
-            safeSetValue('area', data.area || '');
-            safeSetValue('corporation', data.corporation || '');
-            safeSetValue('ward', data.ward || '');
-            safeSetValue('ownerName', data.owner_name || '');
-            safeSetValue('ownerContact', data.owner_contact || '');
-            safeSetValue('city', data.city || '');
-            safeSetValue('state', data.state || '');
-            
-            if (data.geometry) {
-                var coords = null;
-                if (data.geometry.coordinates) {
-                    coords = data.geometry.coordinates[0];
-                } else if (data.geometry.geojson) {
-                    var geom = JSON.parse(data.geometry.geojson);
-                    coords = geom.coordinates[0];
-                }
+    function loadBuildingForEdit(id) {
+        console.log('Loading building for edit:', id);
+        showToast('Loading building data...', 'info');
+        fetch('/api/buildings/' + id + '/')
+            .then(function (response) {
+                if (!response.ok) throw new Error('Building not found');
+                return response.json();
+            })
+            .then(function (data) {
+                console.log('Building data loaded:', data);
+                safeSetText('modalTitle', '✏️ Edit Building');
+                safeSetText('modalSubtitle', 'Update building information');
+                safeSetText('displayBuildingId', '#' + data.id + ' - ' + (data.gis_id || 'N/A'));
+                safeSetValue('buildingId', data.id);
+                safeSetValue('gisId', data.gis_id || '');
+                safeSetValue('buildingName', data.building_name || '');
+                safeSetValue('buildingType', data.building_type || 'OTHER');
+                safeSetValue('floors', data.floors || '');
+                safeSetValue('area', data.area || '');
+                safeSetValue('corporation', data.corporation || '');
+                safeSetValue('ward', data.ward || '');
+                safeSetValue('ownerName', data.owner_name || '');
+                safeSetValue('ownerContact', data.owner_contact || '');
+                safeSetValue('city', data.city || '');
+                safeSetValue('state', data.state || '');
                 
-                if (coords && Array.isArray(coords) && coords.length > 0) {
-                    // Check if coords are in EPSG:3857 and convert
-                    var displayCoords = coords.map(function (p) {
-                        if (Array.isArray(p) && p.length === 2) {
-                            var x = parseFloat(p[0]);
-                            var y = parseFloat(p[1]);
-                            
-                            // If coordinates are in EPSG:3857 (large numbers), convert to EPSG:4326
-                            if (Math.abs(x) > 100000 || Math.abs(y) > 100000) {
-                                var converted = ol.proj.transform([x, y], 'EPSG:3857', 'EPSG:4326');
-                                return converted[1].toFixed(6) + ',' + converted[0].toFixed(6);
-                            } else {
-                                // Already in EPSG:4326, display as lat,lng
-                                return y.toFixed(6) + ',' + x.toFixed(6);
+                if (data.geometry) {
+                    var coords = null;
+                    if (data.geometry.coordinates) {
+                        coords = data.geometry.coordinates[0];
+                    } else if (data.geometry.geojson) {
+                        var geom = JSON.parse(data.geometry.geojson);
+                        coords = geom.coordinates[0];
+                    }
+                    
+                    if (coords && Array.isArray(coords) && coords.length > 0) {
+                        var displayCoords = coords.map(function (p) {
+                            if (Array.isArray(p) && p.length === 2) {
+                                var x = parseFloat(p[0]);
+                                var y = parseFloat(p[1]);
+                                
+                                if (Math.abs(x) > 100000 || Math.abs(y) > 100000) {
+                                    var converted = ol.proj.transform([x, y], 'EPSG:3857', 'EPSG:4326');
+                                    return converted[1].toFixed(6) + ',' + converted[0].toFixed(6);
+                                } else {
+                                    return y.toFixed(6) + ',' + x.toFixed(6);
+                                }
                             }
-                        }
-                        return '';
-                    });
-                    safeSetValue('geometryCoords', displayCoords.join('\n'));
+                            return '';
+                        });
+                        safeSetValue('geometryCoords', displayCoords.join('\n'));
+                    } else {
+                        safeSetValue('geometryCoords', '');
+                    }
                 } else {
                     safeSetValue('geometryCoords', '');
                 }
-            } else {
-                safeSetValue('geometryCoords', '');
-            }
-            
-            var deleteBtn = document.getElementById('deleteBuildingBtn');
-            if (deleteBtn) {
-                deleteBtn.style.display = 'inline-flex';
-                deleteBtn.onclick = function () {
-                    if (confirm('Delete this building?')) {
-                        deleteBuilding(data.id);
-                    }
-                };
-            }
-            
-            var statusDiv = document.getElementById('formStatus');
-            if (statusDiv) {
-                statusDiv.style.display = 'block';
-                statusDiv.className = 'form-status info';
-                statusDiv.innerHTML = '📝 <span>Building loaded. Make changes and click Save.</span>';
-            }
-            
-            $('#buildingModal').modal('show');
-        })
-        .catch(function (error) {
-            console.error('Error loading building:', error);
-            showToast('Error loading building: ' + error.message, 'error');
-        });
-}
+                
+                var deleteBtn = document.getElementById('deleteBuildingBtn');
+                if (deleteBtn) {
+                    deleteBtn.style.display = 'inline-flex';
+                    deleteBtn.onclick = function () {
+                        if (confirm('Delete this building?')) {
+                            deleteBuilding(data.id);
+                        }
+                    };
+                }
+                
+                var statusDiv = document.getElementById('formStatus');
+                if (statusDiv) {
+                    statusDiv.style.display = 'block';
+                    statusDiv.className = 'form-status info';
+                    statusDiv.innerHTML = '📝 <span>Building loaded. Make changes and click Save.</span>';
+                }
+                
+                $('#buildingModal').modal('show');
+            })
+            .catch(function (error) {
+                console.error('Error loading building:', error);
+                showToast('Error loading building: ' + error.message, 'error');
+            });
+    }
+
     // ============================================
     // DELETE BUILDING
     // ============================================
@@ -3148,6 +3664,7 @@ function loadBuildingForEdit(id) {
                 }
             });
             loadBuildings();
+            loadWards();
             var layerSelect = document.getElementById('mapLayer');
             if (layerSelect) {
                 layerSelect.value = 'satellite';
@@ -3193,7 +3710,6 @@ function loadBuildingForEdit(id) {
     window.safeSetValue = safeSetValue;
     window.trackMe = trackMe;
     window.stopTracking = stopTracking;
-    window.getCurrentLocation = getCurrentLocation;
     window.getNextGISId = getNextGISId;
     window.getLastGisIdForCorporation = getLastGisIdForCorporation;
     window.getNextGisIdForCorporation = getNextGisIdForCorporation;
@@ -3201,5 +3717,12 @@ function loadBuildingForEdit(id) {
     window.onCorporationChange = onCorporationChange;
     window.updateGisIdStats = updateGisIdStats;
     window.updateCorporationChips = updateCorporationChips;
+    window.loadDroneImage = loadDroneImage;
+    window.displayDroneImage = displayDroneImage;
+    window.loadWards = loadWards;
+    window.selectWard = selectWard;
+    window.toggleDroneGallery = toggleDroneGallery;
+    window.loadDroneImages = loadDroneImages;
+    window.showDroneImageOnMap = showDroneImageOnMap;
 </script>
 {% endblock %}

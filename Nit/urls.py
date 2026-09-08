@@ -26,6 +26,16 @@ urlpatterns = [
     path('password/reset/<str:token>/', views.reset_password_form, name='reset_password_form'),
     path('password/reset/', views.reset_password, name='reset_password'),
     
+    
+    # --------------drone view-----------
+    path('drone-tiles/<int:z>/<int:x>/<int:y>.jpg', views.drone_tile, name='drone_tile'),
+    path('drone-images/', views.list_drone_images, name='list_drone_images'),
+     path('check-drone-image/', views.check_drone_image, name='check_drone_image'),
+    path('get-drone-image/', views.get_drone_image, name='get_drone_image'),
+    path('list-drone-images/', views.list_drone_images, name='list_drone_images'),
+    path('list-wards-with-drone-images/', views.list_wards_with_drone_images, name='list_wards_with_drone_images'),
+    
+    
     # ============================================
     # COMMON PAGES
     # ============================================
