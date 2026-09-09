@@ -1724,73 +1724,589 @@
     // ============================================
     // DRONE IMAGE FUNCTIONS
     // ============================================
-    function loadDroneImage() {
-        if (droneImageData) {
-            displayDroneImage(droneImageData);
-            return;
-        }
-        
-        showToast('Loading drone image...', 'info');
-        
-        fetch('/get-drone-image/')
-            .then(function(response) { 
-                if (!response.ok) throw new Error('Failed to load drone data');
-                return response.json(); 
-            })
-            .then(function(data) {
-                droneImageData = data;
-                displayDroneImage(data);
-            })
-            .catch(function(error) {
-                console.error('Error loading drone image:', error);
-                showToast('❌ No drone image available', 'error');
-                document.getElementById('mapLayer').value = 'satellite';
-                changeMapLayer();
-            });
+   // ============================================
+// DRONE IMAGE FUNCTIONS
+// ============================================
+
+function getDroneExtent3857(extents) {
+
+    // Fallback extent around your Salem area
+    if (!extents || extents.length !== 4) {
+        extents = [
+            78.1536,
+            11.6446,
+            78.1736,
+            11.6646
+        ];
     }
 
-    function displayDroneImage(data) {
-        if (currentDroneLayer) {
-            map.removeLayer(currentDroneLayer);
-            currentDroneLayer = null;
-        }
-        
-        var extents = data.extents || [78.1536, 11.6446, 78.1736, 11.6646];
-        var min3857 = ol.proj.transform([extents[0], extents[1]], 'EPSG:4326', 'EPSG:3857');
-        var max3857 = ol.proj.transform([extents[2], extents[3]], 'EPSG:4326', 'EPSG:3857');
-        var imageExtent = [min3857[0], min3857[1], max3857[0], max3857[1]];
-        
-        currentDroneLayer = new ol.layer.Image({
-            source: new ol.source.ImageStatic({
-                url: data.url || '/media/Image/91.png',
-                imageExtent: imageExtent,
-                projection: 'EPSG:3857'
-            }),
-            zIndex: 0,
-            name: 'droneLayer',
-            opacity: 1.0
-        });
-        
-        map.addLayer(currentDroneLayer);
-        
-        if (vectorLayer) {
-            map.removeLayer(vectorLayer);
-            vectorLayer.setZIndex(1);
-            map.addLayer(vectorLayer);
-        }
-        
-        map.getView().fit(imageExtent, {
-            padding: [50, 50, 50, 50],
-            maxZoom: 19,
-            duration: 1000
-        });
-        
-        var info = data.name || '91.png';
-        if (data.altitude) {
-            info += ' (Altitude: ' + data.altitude + 'm)';
-        }
-        showToast('✈️ Drone view: ' + info, 'success');
+    extents = extents.map(Number);
+
+    console.log('📷 Original drone extent:', extents);
+
+    // --------------------------------------------
+    // CASE 1:
+    // Already EPSG:3857
+    //
+    // Example:
+    // [8690000, 1300000, 8700000, 1310000]
+    // --------------------------------------------
+    if (
+        Math.abs(extents[0]) > 180 ||
+        Math.abs(extents[1]) > 90 ||
+        Math.abs(extents[2]) > 180 ||
+        Math.abs(extents[3]) > 90
+    ) {
+
+        console.log('✅ Drone extent already EPSG:3857');
+
+        return [
+            extents[0],
+            extents[1],
+            extents[2],
+            extents[3]
+        ];
     }
+
+
+    // --------------------------------------------
+    // CASE 2:
+    // EPSG:4326 longitude / latitude
+    //
+    // Example:
+    // [78.13, 11.64, 78.17, 11.68]
+    // --------------------------------------------
+
+    console.log('🔄 Drone extent is EPSG:4326 → converting to EPSG:3857');
+
+    var bottomLeft = ol.proj.transform(
+        [extents[0], extents[1]],
+        'EPSG:4326',
+        'EPSG:3857'
+    );
+
+    var topRight = ol.proj.transform(
+        [extents[2], extents[3]],
+        'EPSG:4326',
+        'EPSG:3857'
+    );
+
+    return [
+        bottomLeft[0],
+        bottomLeft[1],
+        topRight[0],
+        topRight[1]
+    ];
+}
+
+
+// ============================================
+// LOAD DEFAULT DRONE IMAGE
+// ============================================
+
+function loadDroneImage() {
+
+    if (droneImageData) {
+        displayDroneImage(droneImageData);
+        return;
+    }
+
+    showToast('Loading drone image...', 'info');
+
+    fetch('/get-drone-image/')
+        .then(function(response) {
+
+            if (!response.ok) {
+                throw new Error('Failed to load drone data');
+            }
+
+            return response.json();
+        })
+
+        .then(function(data) {
+
+            console.log('📷 Drone API data:', data);
+
+            if (!data) {
+                throw new Error('Empty drone data');
+            }
+
+            droneImageData = data;
+
+            displayDroneImage(data);
+        })
+
+        .catch(function(error) {
+
+            console.error('❌ Error loading drone image:', error);
+
+            showToast(
+                '❌ No drone image available',
+                'error'
+            );
+
+            var selector =
+                document.getElementById('mapLayer');
+
+            if (selector) {
+                selector.value = 'satellite';
+            }
+
+            changeMapLayer();
+        });
+}
+
+
+// ============================================
+// DISPLAY DRONE IMAGE
+// ============================================
+
+function displayDroneImage(data) {
+
+    if (!map) {
+        console.error('❌ Map not initialized');
+        return;
+    }
+
+    // Remove previous drone layer
+    if (currentDroneLayer) {
+
+        map.removeLayer(currentDroneLayer);
+
+        currentDroneLayer = null;
+    }
+
+
+    // Get extent
+    var rawExtent =
+        data.extents ||
+        data.extent ||
+        data.bounds ||
+        [
+            78.1536,
+            11.6446,
+            78.1736,
+            11.6646
+        ];
+
+
+    var imageExtent =
+        getDroneExtent3857(rawExtent);
+
+
+    console.log(
+        '✅ Final drone EPSG:3857 extent:',
+        imageExtent
+    );
+
+
+    // Check extent
+    if (
+        !imageExtent ||
+        imageExtent.length !== 4 ||
+        imageExtent.some(function(value) {
+            return !Number.isFinite(value);
+        })
+    ) {
+
+        console.error(
+            '❌ Invalid drone extent:',
+            imageExtent
+        );
+
+        showToast(
+            'Invalid drone image coordinates',
+            'error'
+        );
+
+        return;
+    }
+
+
+    // Image URL
+    var imageUrl =
+        data.url ||
+        data.image_url ||
+        '/media/Image/91.png';
+
+
+    console.log(
+        '📷 Drone image URL:',
+        imageUrl
+    );
+
+
+    // Create ImageStatic layer
+    currentDroneLayer =
+        new ol.layer.Image({
+
+            source:
+                new ol.source.ImageStatic({
+
+                    url: imageUrl,
+
+                    imageExtent:
+                        imageExtent,
+
+                    // Map itself is EPSG:3857
+                    projection:
+                        'EPSG:3857'
+                }),
+
+            zIndex: 0,
+
+            opacity: 1,
+
+            name: 'droneLayer'
+        });
+
+
+    // Debug image loading
+    currentDroneLayer
+        .getSource()
+        .on(
+            'imageloadstart',
+            function() {
+
+                console.log(
+                    '⏳ Loading drone image...',
+                    imageUrl
+                );
+            }
+        );
+
+
+    currentDroneLayer
+        .getSource()
+        .on(
+            'imageloadend',
+            function() {
+
+                console.log(
+                    '✅ Drone image loaded:',
+                    imageUrl
+                );
+            }
+        );
+
+
+    currentDroneLayer
+        .getSource()
+        .on(
+            'imageloaderror',
+            function() {
+
+                console.error(
+                    '❌ Drone image failed:',
+                    imageUrl
+                );
+
+                showToast(
+                    'Drone image file could not be loaded',
+                    'error'
+                );
+            }
+        );
+
+
+    map.addLayer(
+        currentDroneLayer
+    );
+
+
+    // Keep building polygons above drone image
+    if (vectorLayer) {
+
+        map.removeLayer(vectorLayer);
+
+        vectorLayer.setZIndex(10);
+
+        map.addLayer(vectorLayer);
+    }
+
+
+    // Fit map exactly to drone image
+    map.getView().fit(
+        imageExtent,
+        {
+            padding:
+                [20, 20, 20, 20],
+
+            duration:
+                800
+        }
+    );
+
+
+    map.render();
+
+
+    var info =
+        data.name ||
+        data.filename ||
+        '91.png';
+
+
+    showToast(
+        '✈️ Drone View: ' + info,
+        'success'
+    );
+}
+
+
+// ============================================
+// SHOW WARD DRONE IMAGE
+// ============================================
+
+function showDroneImageForWard(data) {
+
+    droneImageData = data;
+
+    displayDroneImage(data);
+
+    var selector =
+        document.getElementById('mapLayer');
+
+    if (selector) {
+        selector.value = 'drone';
+    }
+}
+
+
+// ============================================
+// DRONE GALLERY
+// ============================================
+
+function toggleDroneGallery() {
+
+    var gallery =
+        document.getElementById('droneGallery');
+
+    if (!gallery) {
+        return;
+    }
+
+
+    if (
+        gallery.classList.contains('show')
+    ) {
+
+        gallery.classList.remove('show');
+
+    } else {
+
+        gallery.classList.add('show');
+
+        loadDroneImages();
+    }
+}
+
+
+// ============================================
+// LOAD DRONE GALLERY IMAGES
+// ============================================
+
+function loadDroneImages() {
+
+    var container =
+        document.getElementById(
+            'droneImageList'
+        );
+
+
+    if (!container) {
+        return;
+    }
+
+
+    container.innerHTML = `
+        <div style="
+            text-align:center;
+            padding:20px;
+            color:#777;
+        ">
+            <i class="fas fa-spinner fa-spin"></i>
+            Loading drone images...
+        </div>
+    `;
+
+
+    fetch('/list-drone-images/')
+
+        .then(function(response) {
+
+            if (!response.ok) {
+                throw new Error(
+                    'Unable to load drone images'
+                );
+            }
+
+            return response.json();
+        })
+
+        .then(function(data) {
+
+            console.log(
+                '📷 Drone gallery response:',
+                data
+            );
+
+
+            // Accept different API formats
+            var images =
+                Array.isArray(data)
+                    ? data
+                    : (
+                        data.images ||
+                        data.results ||
+                        []
+                    );
+
+
+            if (!images.length) {
+
+                container.innerHTML = `
+                    <div style="
+                        text-align:center;
+                        padding:20px;
+                        color:#999;
+                    ">
+                        No drone images found
+                    </div>
+                `;
+
+                return;
+            }
+
+
+            var html = '';
+
+
+            images.forEach(
+                function(image, index) {
+
+                    var imageUrl =
+                        image.url ||
+                        image.image_url ||
+                        image.path ||
+                        '';
+
+
+                    var imageName =
+                        image.name ||
+                        image.filename ||
+                        (
+                            'Drone Image ' +
+                            (index + 1)
+                        );
+
+
+                    html += `
+
+                        <div
+                            class="drone-thumb"
+                            onclick='showDroneImageOnMap(
+                                ${JSON.stringify(image)}
+                            )'
+                        >
+
+                            <img
+                                src="${imageUrl}"
+                                alt="${imageName}"
+                            >
+
+                            <div class="thumb-info">
+
+                                <strong>
+                                    ${imageName}
+                                </strong>
+
+                                ${
+                                    image.ward
+                                    ?
+                                    `<small>
+                                        Ward ${image.ward}
+                                    </small>`
+                                    :
+                                    ''
+                                }
+
+                            </div>
+
+                        </div>
+                    `;
+                }
+            );
+
+
+            container.innerHTML = html;
+        })
+
+        .catch(function(error) {
+
+            console.error(
+                '❌ Drone gallery error:',
+                error
+            );
+
+
+            container.innerHTML = `
+                <div style="
+                    text-align:center;
+                    padding:20px;
+                    color:#dc3545;
+                ">
+                    Unable to load drone images
+                </div>
+            `;
+        });
+}
+
+
+// ============================================
+// CLICK GALLERY IMAGE -> SHOW ON MAP
+// ============================================
+
+function showDroneImageOnMap(data) {
+
+    console.log(
+        '📷 Selected gallery image:',
+        data
+    );
+
+
+    droneImageData = data;
+
+
+    displayDroneImage(data);
+
+
+    var selector =
+        document.getElementById(
+            'mapLayer'
+        );
+
+
+    if (selector) {
+
+        selector.value =
+            'drone';
+    }
+
+
+    var gallery =
+        document.getElementById(
+            'droneGallery'
+        );
+
+
+    if (gallery) {
+
+        gallery.classList.remove(
+            'show'
+        );
+    }
+}
 
     // ============================================
     // WARD FUNCTIONS
@@ -1890,14 +2406,34 @@
             currentDroneLayer = null;
         }
         
-        var extents = data.extents || [78.1536, 11.6446, 78.1736, 11.6646];
-        var min3857 = ol.proj.transform([extents[0], extents[1]], 'EPSG:4326', 'EPSG:3857');
-        var max3857 = ol.proj.transform([extents[2], extents[3]], 'EPSG:4326', 'EPSG:3857');
+ var extents = data.extents;
+
+console.log("DRONE EXTENTS:", extents);
+console.log("DRONE IMAGE:", data.url);
+
+var imageExtent = extents;
+
+// If coordinates are WGS84, convert them.
+// If coordinates came from PGW, they are already EPSG:3857.
+if (
+    Math.abs(extents[0]) <= 180 &&
+    Math.abs(extents[1]) <= 90 &&
+    Math.abs(extents[2]) <= 180 &&
+    Math.abs(extents[3]) <= 90
+) {
+    imageExtent = ol.proj.transformExtent(
+        extents,
+        'EPSG:4326',
+        'EPSG:3857'
+    );
+}
+
+console.log("DRONE IMAGE EXTENT 3857:", imageExtent);
         
         currentDroneLayer = new ol.layer.Image({
             source: new ol.source.ImageStatic({
                 url: data.url,
-                imageExtent: [min3857[0], min3857[1], max3857[0], max3857[1]],
+                imageExtent: imageExtent,
                 projection: 'EPSG:3857'
             }),
             zIndex: 0,
@@ -1913,7 +2449,7 @@
             map.addLayer(vectorLayer);
         }
         
-        map.getView().fit([min3857[0], min3857[1], max3857[0], max3857[1]], {
+        map.getView().fit(imageExtent, {
             padding: [50, 50, 50, 50],
             maxZoom: 19,
             duration: 1000
@@ -1959,94 +2495,7 @@
             changeMapLayer();
         });
 }
-function displayDroneImage(data) {
-    if (currentDroneLayer) {
-        map.removeLayer(currentDroneLayer);
-        currentDroneLayer = null;
-    }
-    
-    var extents = data.extents || [78.1536, 11.6446, 78.1736, 11.6646];
-    var min3857 = ol.proj.transform([extents[0], extents[1]], 'EPSG:4326', 'EPSG:3857');
-    var max3857 = ol.proj.transform([extents[2], extents[3]], 'EPSG:4326', 'EPSG:3857');
-    var imageExtent = [min3857[0], min3857[1], max3857[0], max3857[1]];
-    
-    currentDroneLayer = new ol.layer.Image({
-        source: new ol.source.ImageStatic({
-            url: data.url || '/media/Image/91.png',
-            imageExtent: imageExtent,
-            projection: 'EPSG:3857'
-        }),
-        zIndex: 0,
-        name: 'droneLayer',
-        opacity: 1.0
-    });
-    
-    map.addLayer(currentDroneLayer);
-    
-    if (vectorLayer) {
-        map.removeLayer(vectorLayer);
-        vectorLayer.setZIndex(1);
-        map.addLayer(vectorLayer);
-    }
-    
-    map.getView().fit(imageExtent, {
-        padding: [50, 50, 50, 50],
-        maxZoom: 19,
-        duration: 1000
-    });
-    
-    var info = data.name || '91.png';
-    if (data.altitude) {
-        info += ' (Altitude: ' + data.altitude + 'm)';
-    }
-    showToast('✈️ Drone view: ' + info, 'success');
-}
 
-    function showDroneImageOnMap(imageUrl, extents, name) {
-        document.getElementById('droneGallery').classList.remove('show');
-        
-        if (!extents || extents.length !== 4) {
-            showToast('⚠️ Image has no extents data', 'warning');
-            return;
-        }
-        
-        document.getElementById('mapLayer').value = 'drone';
-        
-        if (currentDroneLayer) {
-            map.removeLayer(currentDroneLayer);
-            currentDroneLayer = null;
-        }
-        
-        var min3857 = ol.proj.transform([extents[0], extents[1]], 'EPSG:4326', 'EPSG:3857');
-        var max3857 = ol.proj.transform([extents[2], extents[3]], 'EPSG:4326', 'EPSG:3857');
-        
-        currentDroneLayer = new ol.layer.Image({
-            source: new ol.source.ImageStatic({
-                url: imageUrl,
-                imageExtent: [min3857[0], min3857[1], max3857[0], max3857[1]],
-                projection: 'EPSG:3857'
-            }),
-            zIndex: 0,
-            name: 'droneLayer',
-            opacity: 0.9
-        });
-        
-        map.addLayer(currentDroneLayer);
-        
-        if (vectorLayer) {
-            map.removeLayer(vectorLayer);
-            vectorLayer.setZIndex(1);
-            map.addLayer(vectorLayer);
-        }
-        
-        map.getView().fit([min3857[0], min3857[1], max3857[0], max3857[1]], {
-            padding: [50, 50, 50, 50],
-            maxZoom: 19,
-            duration: 1000
-        });
-        
-        showToast('✈️ Showing: ' + name, 'success');
-    }
 
     // ============================================
     // RESET MAP VIEW
