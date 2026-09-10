@@ -416,9 +416,7 @@
         <button onclick="trackMe()" class="toolbar-btn btn-track">
             <i class="fas fa-location-dot"></i> Track Me
         </button>
-        <button onclick="toggleDroneGallery()" class="toolbar-btn" style="background: linear-gradient(135deg, #e67e22, #f39c12); color: white;">
-            <i class="fas fa-images"></i> Drone Gallery
-        </button>
+        
         <style>
             .btn-track {
                 background: linear-gradient(135deg, #e74c3c, #f39c12);
@@ -1059,7 +1057,7 @@
     }
 
     #map {
-        height: 65vh;
+        height: 700px;
         width: 100%;
         border-radius: var(--radius);
         border: 1px solid rgba(0, 0, 0, 0.06);
@@ -1657,82 +1655,110 @@
    function changeMapLayer() {
     if (!map) return;
     var type = document.getElementById('mapLayer').value;
-    var layers = map.getLayers();
-    var toRemove = [];
-    
-    layers.forEach(function (layer) {
-        if (layer instanceof ol.layer.Tile || layer instanceof ol.layer.Image) {
-            toRemove.push(layer);
-        }
+
+    // ✅ ALWAYS keep a satellite base layer underneath
+    var existingBase = null;
+    var existingDrone = null;
+
+    map.getLayers().forEach(function (layer) {
+        if (layer.get('name') === 'baseLayer') existingBase = layer;
+        if (layer.get('name') === 'droneLayer') existingDrone = layer;
     });
-    toRemove.forEach(function (layer) {
-        map.removeLayer(layer);
-    });
-    
-    var baseLayer;
+
+    // Remove only the drone layer if we're switching away from drone
+    if (existingDrone && type !== 'drone') {
+        map.removeLayer(existingDrone);
+        currentDroneLayer = null;
+    }
+
+    // Build the base layer per selection
+    // (Everything uses a tile layer — even 'drone' uses satellite as base)
+    var baseUrl, baseMaxZoom = 20;
+
     switch (type) {
         case 'satellite':
-            baseLayer = new ol.layer.Tile({
-                source: new ol.source.XYZ({
-                    url: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
-                    maxZoom: 20
-                }),
-                zIndex: 0
-            });
-            map.addLayer(baseLayer);
+        case 'drone':   // ✅ drone uses satellite as its base
+            baseUrl = 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
             break;
-        case 'dark':
-            baseLayer = new ol.layer.Tile({
-                source: new ol.source.XYZ({
-                    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-                    maxZoom: 19,
-                    subdomains: ['a', 'b', 'c', 'd']
-                }),
-                zIndex: 0
-            });
-            map.addLayer(baseLayer);
+        case 'osm':
+            baseUrl = null; // handle OSM specially
             break;
         case 'light':
-            baseLayer = new ol.layer.Tile({
-                source: new ol.source.OSM({
-                    maxZoom: 19
-                }),
-                zIndex: 0
-            });
-            map.addLayer(baseLayer);
+            baseUrl = null;
             break;
-        case 'drone':
-    // If we have drone data, display it
-    if (droneImageData) {
-        displayDroneImage(droneImageData);
-    } else {
-        // Try to load from server
-        loadDroneImage();
-    }
-    break;
         default:
-            baseLayer = new ol.layer.Tile({
-                source: new ol.source.OSM({
-                    maxZoom: 19
-                }),
-                zIndex: 0
-            });
-            map.addLayer(baseLayer);
+            baseUrl = 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
     }
-    
-    // Re-add vector layer on top
+
+    // Replace base layer only if type changed
+    if (existingBase) map.removeLayer(existingBase);
+
+    var newBase;
+    if (type === 'osm') {
+        newBase = new ol.layer.Tile({
+            source: new ol.source.OSM({ maxZoom: 19 }),
+            zIndex: 0,
+            name: 'baseLayer'
+        });
+    } else if (type === 'light') {
+        newBase = new ol.layer.Tile({
+            source: new ol.source.XYZ({
+                url: 'https://{a-c}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                maxZoom: 19
+            }),
+            zIndex: 0,
+            name: 'baseLayer'
+        });
+    } else if (baseUrl.indexOf('cartocdn') !== -1) {
+        newBase = new ol.layer.Tile({
+            source: new ol.source.XYZ({
+                url: baseUrl,
+                maxZoom: 19,
+                subdomains: ['a', 'b', 'c', 'd']
+            }),
+            zIndex: 0,
+            name: 'baseLayer'
+        });
+    } else {
+        newBase = new ol.layer.Tile({
+            source: new ol.source.XYZ({
+                url: baseUrl,
+                maxZoom: baseMaxZoom
+            }),
+            zIndex: 0,
+            name: 'baseLayer'
+        });
+    }
+
+    map.addLayer(newBase);
+
+    // ✅ Vector layer always on top
     if (vectorLayer) {
         map.removeLayer(vectorLayer);
-        vectorLayer.setZIndex(1);
+        vectorLayer.setZIndex(10);
         map.addLayer(vectorLayer);
     }
-    
+
+    // ✅ If drone selected, add drone overlay WITHOUT moving the map
+    if (type === 'drone') {
+        if (currentDroneLayer) {
+            // Already loaded — just re-add above base
+            map.removeLayer(currentDroneLayer);
+            currentDroneLayer.setZIndex(5);
+            map.addLayer(currentDroneLayer);
+            console.log('✈️ Drone layer re-added (no fit)');
+        } else if (droneImageData) {
+            displayDroneImage(droneImageData, /* skipFit = */ true);
+        } else {
+            loadDroneImage(/* skipFit = */ true);
+        }
+    }
+
     map.render();
-    
+
     var layerNames = {
         'satellite': '🛰️ Satellite View',
         'osm': '🗺️ Street View',
-        'dark': '🌙 Dark Mode',
         'light': '☀️ Light Mode',
         'drone': '✈️ Drone View'
     };
@@ -1746,59 +1772,36 @@
 // ============================================
 
 function getDroneExtent3857(extents) {
-    // Fallback extent - use the actual location from your data
+    // FIX: Use actual location (Coimbatore area matching your GeoJSON)
     if (!extents || extents.length !== 4) {
-        // Default to Salem, Tamil Nadu area
-        extents = [78.1536, 11.6446, 78.1736, 11.6646];
+        // Coimbatore / Kulathupalayam area
+        extents = [76.9400, 10.9430, 76.9450, 10.9470];
     }
 
     extents = extents.map(Number);
-
     console.log('📷 Original drone extent:', extents);
 
-    // Check if already EPSG:3857 (values > 180 or > 90 indicate EPSG:3857)
-    if (
-        Math.abs(extents[0]) > 180 ||
-        Math.abs(extents[1]) > 90 ||
-        Math.abs(extents[2]) > 180 ||
-        Math.abs(extents[3]) > 90
-    ) {
+    // Check if already EPSG:3857
+    if (Math.abs(extents[0]) > 180 || Math.abs(extents[1]) > 90 ||
+        Math.abs(extents[2]) > 180 || Math.abs(extents[3]) > 90) {
         console.log('✅ Drone extent already EPSG:3857');
         return extents;
     }
 
-    // Convert EPSG:4326 to EPSG:3857
-    console.log('🔄 Converting EPSG:4326 to EPSG:3857');
-    
+    // Convert WGS84 -> EPSG:3857
     try {
         var bottomLeft = ol.proj.transform(
-            [extents[0], extents[1]],
-            'EPSG:4326',
-            'EPSG:3857'
+            [extents[0], extents[1]], 'EPSG:4326', 'EPSG:3857'
         );
-
         var topRight = ol.proj.transform(
-            [extents[2], extents[3]],
-            'EPSG:4326',
-            'EPSG:3857'
+            [extents[2], extents[3]], 'EPSG:4326', 'EPSG:3857'
         );
-
-        var result = [
-            bottomLeft[0],
-            bottomLeft[1],
-            topRight[0],
-            topRight[1]
-        ];
-        
-        console.log('✅ Converted extent:', result);
-        return result;
+        return [bottomLeft[0], bottomLeft[1], topRight[0], topRight[1]];
     } catch(e) {
         console.error('❌ Conversion error:', e);
-        // Return fallback extent
-        return [8690000, 1300000, 8700000, 1310000];
+        return [8565000, 1225700, 8565400, 1226000]; // Coimbatore fallback in 3857
     }
 }
-
 
 // ============================================
 // LOAD DEFAULT DRONE IMAGE
@@ -1832,7 +1835,7 @@ function loadDroneImage() {
             }
 
             droneImageData = data;
-
+console.log("new",droneImageData);
             displayDroneImage(data);
         })
 
@@ -1861,119 +1864,72 @@ function loadDroneImage() {
 // DISPLAY DRONE IMAGE
 // ============================================
 
-function displayDroneImage(data) {
-    if (!map) {
-        console.error('❌ Map not initialized');
-        return;
-    }
+function displayDroneImage(data, skipFit) {
+    if (!map) return;
 
-    // Remove previous drone layer
     if (currentDroneLayer) {
         map.removeLayer(currentDroneLayer);
         currentDroneLayer = null;
     }
 
-    // Get extent - handle different data formats
     var rawExtent = data.extents || data.extent || data.bounds;
-    
-    // If we have a ward number, try to get the correct extent
-    if (!rawExtent && data.ward) {
-        // You might want to fetch the correct extent for this ward
-        console.log('⚠️ No extent found for ward:', data.ward);
-        // Use a default extent for the area
-        rawExtent = [78.1536, 11.6446, 78.1736, 11.6646];
-    }
 
-    // If still no extent, use default
+    // ✅ Match your building data (Coimbatore / Kulathupalayam)
     if (!rawExtent || rawExtent.length !== 4) {
-        rawExtent = [78.1536, 11.6446, 78.1736, 11.6646];
+        rawExtent = [76.9390, 10.9420, 76.9460, 10.9480];
     }
 
     var imageExtent = getDroneExtent3857(rawExtent);
 
-    console.log('✅ Final drone EPSG:3857 extent:', imageExtent);
-
-    // Validate extent
-    if (
-        !imageExtent ||
-        imageExtent.length !== 4 ||
-        imageExtent.some(function(value) {
-            return !Number.isFinite(value);
-        })
-    ) {
-        console.error('❌ Invalid drone extent:', imageExtent);
-        showToast('Invalid drone image coordinates', 'error');
-        return;
+    // Sanity check
+    if (!imageExtent || imageExtent.length !== 4 ||
+        imageExtent.some(v => !Number.isFinite(v))) {
+        console.warn('⚠️ Invalid drone extent, using building extent');
+        imageExtent = vectorSource.getExtent();
     }
 
-    // Get image URL
     var imageUrl = data.url || data.image_url || data.path || '/media/Image/91.png';
-    
-    // Ensure URL is absolute if it's relative
-    if (imageUrl.startsWith('/')) {
-        imageUrl = window.location.origin + imageUrl;
-    }
+    if (imageUrl.startsWith('/')) imageUrl = window.location.origin + imageUrl;
 
-    console.log('📷 Drone image URL:', imageUrl);
-
-    // Create ImageStatic layer with proper settings
     currentDroneLayer = new ol.layer.Image({
         source: new ol.source.ImageStatic({
             url: imageUrl,
             imageExtent: imageExtent,
             projection: 'EPSG:3857'
         }),
-        zIndex: 0,
+        zIndex: 5,
         opacity: 1.0,
-        name: 'droneLayer'
+        name: 'droneLayer'   // ✅ give it a name so we can find it later
     });
 
-    // Add debug events
-    var source = currentDroneLayer.getSource();
-    
-    source.on('imageloadstart', function() {
-        console.log('⏳ Loading drone image...', imageUrl);
-        showToast('Loading drone image...', 'info');
-    });
-
-    source.on('imageloadend', function() {
+    currentDroneLayer.getSource().on('imageloadend', function () {
         console.log('✅ Drone image loaded:', imageUrl);
-        showToast('✅ Drone image loaded successfully!', 'success');
+    });
+    currentDroneLayer.getSource().on('imageloaderror', function () {
+        console.error('❌ Drone image failed:', imageUrl);
+        showToast('❌ Drone image failed to load', 'error');
     });
 
-    source.on('imageloaderror', function(event) {
-        console.error('❌ Drone image failed:', imageUrl, event);
-        showToast('❌ Drone image file could not be loaded', 'error');
-    });
-
-    // Add the layer
     map.addLayer(currentDroneLayer);
 
-    // Ensure vector layer is on top
     if (vectorLayer) {
         map.removeLayer(vectorLayer);
         vectorLayer.setZIndex(10);
         map.addLayer(vectorLayer);
     }
 
-    // Fit map to the drone image with proper padding
-    try {
+    // ✅ ONLY fit if caller didn't pass skipFit
+    if (!skipFit) {
         map.getView().fit(imageExtent, {
             padding: [50, 50, 50, 50],
             duration: 800,
             maxZoom: 20
         });
-        console.log('✅ Map fitted to drone extent');
-    } catch(e) {
-        console.error('❌ Error fitting map:', e);
     }
 
     map.render();
-
-    var info = data.name || data.filename || 'Drone Image';
-    showToast('✈️ Drone View: ' + info, 'success');
+    showToast('✈️ Drone View active', 'success');
 }
-
 
 // ============================================
 // SHOW WARD DRONE IMAGE
@@ -2048,192 +2004,36 @@ function selectWard(wardNumber) {
         });
 }
 
-// ============================================
-// DRONE GALLERY
-// ============================================
 
-function toggleDroneGallery() {
-
-    var gallery =
-        document.getElementById('droneGallery');
-
-    if (!gallery) {
-        return;
-    }
-
-
-    if (
-        gallery.classList.contains('show')
-    ) {
-
-        gallery.classList.remove('show');
-
-    } else {
-
-        gallery.classList.add('show');
-
-        loadDroneImages();
-    }
-}
 
 
 // ============================================
 // LOAD DRONE GALLERY IMAGES
 // ============================================
 
-function loadDroneImages() {
-
-    var container =
-        document.getElementById(
-            'droneImageList'
-        );
-
-
-    if (!container) {
+function loadDroneImage(skipFit) {
+    if (droneImageData) {
+        displayDroneImage(droneImageData, skipFit);
         return;
     }
 
+    showToast('Loading drone image...', 'info');
 
-    container.innerHTML = `
-        <div style="
-            text-align:center;
-            padding:20px;
-            color:#777;
-        ">
-            <i class="fas fa-spinner fa-spin"></i>
-            Loading drone images...
-        </div>
-    `;
-
-
-    fetch('/list-drone-images/')
-
-        .then(function(response) {
-
-            if (!response.ok) {
-                throw new Error(
-                    'Unable to load drone images'
-                );
-            }
-
+    fetch('/get-drone-image/')
+        .then(function (response) {
+            if (!response.ok) throw new Error('Failed to load drone data');
             return response.json();
         })
-
-        .then(function(data) {
-
-            console.log(
-                '📷 Drone gallery response:',
-                data
-            );
-
-
-            // Accept different API formats
-            var images =
-                Array.isArray(data)
-                    ? data
-                    : (
-                        data.images ||
-                        data.results ||
-                        []
-                    );
-
-
-            if (!images.length) {
-
-                container.innerHTML = `
-                    <div style="
-                        text-align:center;
-                        padding:20px;
-                        color:#999;
-                    ">
-                        No drone images found
-                    </div>
-                `;
-
-                return;
-            }
-
-
-            var html = '';
-
-
-            images.forEach(
-                function(image, index) {
-
-                    var imageUrl =
-                        image.url ||
-                        image.image_url ||
-                        image.path ||
-                        '';
-
-
-                    var imageName =
-                        image.name ||
-                        image.filename ||
-                        (
-                            'Drone Image ' +
-                            (index + 1)
-                        );
-
-
-                    html += `
-
-                        <div
-                            class="drone-thumb"
-                            onclick='showDroneImageOnMap(
-                                ${JSON.stringify(image)}
-                            )'
-                        >
-
-                            <img
-                                src="${imageUrl}"
-                                alt="${imageName}"
-                            >
-
-                            <div class="thumb-info">
-
-                                <strong>
-                                    ${imageName}
-                                </strong>
-
-                                ${
-                                    image.ward
-                                    ?
-                                    `<small>
-                                        Ward ${image.ward}
-                                    </small>`
-                                    :
-                                    ''
-                                }
-
-                            </div>
-
-                        </div>
-                    `;
-                }
-            );
-
-
-            container.innerHTML = html;
+        .then(function (data) {
+            console.log('📷 Drone API data:', data);
+            droneImageData = data;
+            displayDroneImage(data, skipFit);
         })
-
-        .catch(function(error) {
-
-            console.error(
-                '❌ Drone gallery error:',
-                error
-            );
-
-
-            container.innerHTML = `
-                <div style="
-                    text-align:center;
-                    padding:20px;
-                    color:#dc3545;
-                ">
-                    Unable to load drone images
-                </div>
-            `;
+        .catch(function (error) {
+            console.error('❌ Drone error:', error);
+            showToast('❌ No drone image available', 'error');
+            document.getElementById('mapLayer').value = 'satellite';
+            changeMapLayer();
         });
 }
 
@@ -2409,9 +2209,9 @@ console.log("DRONE IMAGE EXTENT 3857:", imageExtent);
             source: new ol.source.ImageStatic({
                 url: data.url,
                 imageExtent: imageExtent,
-                projection: 'EPSG:3857'
+                projection: 'EPSG:4326'
             }),
-            zIndex: 0,
+            zIndex: 5,
             name: 'droneLayer',
             opacity: 0.9
         });
@@ -2425,7 +2225,7 @@ console.log("DRONE IMAGE EXTENT 3857:", imageExtent);
         }
         
         map.getView().fit(imageExtent, {
-            padding: [50, 50, 50, 50],
+            padding: [-100, 50, 50, 50],
             maxZoom: 19,
             duration: 1000
         });
@@ -2433,18 +2233,7 @@ console.log("DRONE IMAGE EXTENT 3857:", imageExtent);
         document.getElementById('mapLayer').value = 'drone';
     }
 
-    // ============================================
-    // DRONE GALLERY FUNCTIONS
-    // ============================================
-    function toggleDroneGallery() {
-        var gallery = document.getElementById('droneGallery');
-        if (gallery.classList.contains('show')) {
-            gallery.classList.remove('show');
-        } else {
-            gallery.classList.add('show');
-            loadDroneImages();
-        }
-    }
+
 
     function loadDroneImage() {
     if (droneImageData) {
@@ -4145,7 +3934,7 @@ function resetMapView() {
     window.displayDroneImage = displayDroneImage;
     window.loadWards = loadWards;
     window.selectWard = selectWard;
-    window.toggleDroneGallery = toggleDroneGallery;
+
     window.loadDroneImages = loadDroneImages;
     window.showDroneImageOnMap = showDroneImageOnMap;
 </script>

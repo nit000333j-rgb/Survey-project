@@ -676,87 +676,11 @@ def map_view(request):
         }
         return render(request, 'map_view.html', context)
 
-# @login_required
-# def buildings_geojson(request, corporation_id=None):
-#     """API endpoint - Return all buildings or filter by corporation"""
-#     import json
-    
-#     if corporation_id:
-#         buildings = Building.objects.filter(corporation_id=corporation_id, geometry__isnull=False)
-#     else:
-#         buildings = Building.objects.filter(geometry__isnull=False)
-    
-#     features = []
-#     for building in buildings:
-#         if building.geometry:
-#             try:
-#                 geom_json = json.loads(building.geometry.geojson)
-                
-#                 feature = {
-#                     'type': 'Feature',
-#                     'geometry': geom_json,
-#                     'properties': {
-#                         'id': building.id,
-#                         'gis_id': building.gis_id,
-#                         'building_number': building.building_number,
-#                         'building_name': building.building_name,
-#                         'area': float(building.area) if building.area else 0,
-#                         'owner_name': building.owner_name,
-#                         'address': building.address,
-#                         'city': building.city,
-#                         'building_type': building.building_type,
-#                         'floors': building.floors,
-#                         'year_built': building.year_built,
-#                         'owner_contact': building.owner_contact,
-#                         'state': building.state,
-#                         'pincode': building.pincode,
-#                         'corporation': building.corporation.name if building.corporation else None,  # ADD THIS LINE
-#                         'corporation_id': building.corporation.id if building.corporation else None,  # ADD THIS LINE
-#                     }
-#                 }
-#                 features.append(feature)
-#             except Exception as e:
-#                 print(f"Error processing building {building.id}: {e}")
-#                 continue
-    
-#     geojson = {
-#         'type': 'FeatureCollection',
-#         'features': features
-#     }
-    
-#     return JsonResponse(geojson)
-
-
 
 @login_required
 def buildings_geojson(request, corporation_id=None):
-    """API endpoint - Return geometry converted to WGS84 for map display"""
+    """API endpoint - Return buildings as GeoJSON in WGS84 for map display"""
     import json
-    import math
-    
-    def web_mercator_to_wgs84(x, y):
-        """Convert Web Mercator (EPSG:3857) to WGS84 (EPSG:4326)"""
-        lon = (x / 20037508.34) * 180
-        lat = (y / 20037508.34) * 180
-        lat = 180 / math.pi * (2 * math.atan(math.exp(lat * math.pi / 180)) - math.pi / 2)
-        return [lon, lat]
-    
-    def convert_coords(coords):
-        """Recursively convert coordinates from 3857 to 4326, or keep if already 4326"""
-        if not coords:
-            return coords
-        
-        if isinstance(coords[0], list):
-            return [convert_coords(c) for c in coords]
-        else:
-            if len(coords) >= 2:
-                # Check if coordinates are in Web Mercator (huge numbers)
-                if abs(coords[0]) > 1000000 or abs(coords[1]) > 1000000:
-                    return web_mercator_to_wgs84(coords[0], coords[1])
-                else:
-                    # Already in WGS84 (e.g., 78.1633) - return as is!
-                    return [coords[0], coords[1]]
-            return coords
     
     if corporation_id:
         buildings = Building.objects.filter(corporation_id=corporation_id, geometry__isnull=False)
@@ -765,50 +689,51 @@ def buildings_geojson(request, corporation_id=None):
     
     features = []
     for building in buildings:
-        if building.geometry:
-            try:
-                # Get geometry as GeoJSON (stored in 3857)
-                geom_json = json.loads(building.geometry.geojson)
-                
-                # ✅ Convert from 3857 to 4326 for Leaflet
-                if geom_json['type'] == 'Polygon':
-                    geom_json['coordinates'] = convert_coords(geom_json['coordinates'])
-                elif geom_json['type'] == 'MultiPolygon':
-                    geom_json['coordinates'] = [convert_coords(poly) for poly in geom_json['coordinates']]
-                
-                feature = {
-                    'type': 'Feature',
-                    'geometry': geom_json,
-                    'properties': {
-                        'id': building.id,
-                        'gis_id': building.gis_id,
-                        'building_number': building.building_number,
-                        'building_name': building.building_name,
-                        'area': float(building.area) if building.area else 0,
-                        'owner_name': building.owner_name,
-                        'address': building.address,
-                        'city': building.city,
-                        'building_type': building.building_type,
-                        'floors': building.floors,
-                        'year_built': building.year_built,
-                        'owner_contact': building.owner_contact,
-                        'state': building.state,
-                        'pincode': building.pincode,
-                        'corporation': building.corporation.name if building.corporation else None,
-                        'corporation_id': building.corporation.id if building.corporation else None,
-                    }
+        if not building.geometry:   
+            continue
+        try:
+            # 🔧 Clone and re-label as 3857 because the data is actually stored
+            # as EPSG:3857 meters but the column claims SRID=4326
+            geom = building.geometry.clone()
+            geom.srid = 3857
+            
+            # Now GeoDjango will do the transform PROPERLY using PROJ
+            geom.transform(4326)
+            
+            geom_json = json.loads(geom.geojson)
+            
+            features.append({
+                'type': 'Feature',
+                'geometry': geom_json,
+                'properties': {
+                    'id': building.id,
+                    'gis_id': building.gis_id,
+                    'building_number': building.building_number,
+                    'building_name': building.building_name,
+                    'area': float(building.area) if building.area else 0,
+                    'owner_name': building.owner_name,
+                    'address': building.address,
+                    'city': building.city,
+                    'building_type': building.building_type,
+                    'floors': building.floors,
+                    'year_built': building.year_built,
+                    'owner_contact': building.owner_contact,
+                    'state': building.state,
+                    'pincode': building.pincode,
+                    'corporation': building.corporation.name if building.corporation else None,
+                    'corporation_id': building.corporation.id if building.corporation else None,
                 }
-                features.append(feature)
-            except Exception as e:
-                print(f"Error processing building {building.id}: {e}")
-                continue
+            })
+        except Exception as e:
+            print(f"Error processing building {building.id}: {e}")
+            continue
     
-    geojson = {
+    return JsonResponse({
         'type': 'FeatureCollection',
         'features': features
-    }
+    })
     
-    return JsonResponse(geojson)
+    
 def get_default_context():
     """Get default context with all buildings"""
     buildings = Building.objects.all()
@@ -1284,6 +1209,7 @@ def process_geojson(geo_file, data, geo_type):
                     }), srid=3857)
                 else:
                     geom = GEOSGeometry(json.dumps(geometry), srid=3857)
+                    geom.transform(4326)
                 
                 gis_id = properties.get('GIS_ID') or f"B-{str(i).zfill(4)}"
                 
