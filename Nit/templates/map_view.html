@@ -1800,23 +1800,32 @@ if (type === 'drone') {
     // ============================================
     // DISPLAY DRONE IMAGE
     // ============================================
-    function displayDroneImage(data, skipFit) {
-        if (!map) return;
+function displayDroneImage(data, skipFit) {
+    if (!map) return;
 
-        if (currentDroneLayer) {
-            map.removeLayer(currentDroneLayer);
-            currentDroneLayer = null;
-        }
+    if (currentDroneLayer) {
+        map.removeLayer(currentDroneLayer);
+        currentDroneLayer = null;
+    }
 
-var droneImageBounds = [76.9400, 10.9430, 76.9450, 10.9470]; // <--- CHANGE THIS
+    // ✅ CORRECT extent from your QGIS Layer Properties (EPSG:3857)
+    // Order in OL: [minX, minY, maxX, maxY]  =  [left, bottom, right, top]
+    var droneImageBounds = [
+        8562080.15429,   // Left  (minX)
+        1223611.8735,    // Bottom (minY)
+        8568689.33811,   // Right (maxX)
+        1226988.6517     // Top   (maxY)
+    ];
 
-var rawExtent = data.extents || data.extent || data.bounds || droneImageBounds;
+    var rawExtent = data.extents || data.extent || data.bounds || droneImageBounds;
 
-if (!rawExtent || rawExtent.length !== 4) {
-    rawExtent = droneImageBounds;
-}
+    // If API sends lat/lng (small values), fall back to the correct EPSG:3857 box
+    if (!rawExtent || rawExtent.length !== 4 ||
+        Math.abs(rawExtent[0]) < 100000 || Math.abs(rawExtent[2]) < 100000) {
+        rawExtent = droneImageBounds;
+    }
 
-        var imageExtent = getDroneExtent3857(rawExtent);
+    var imageExtent = rawExtent.map(Number);
 
         if (!imageExtent || imageExtent.length !== 4 ||
             imageExtent.some(v => !Number.isFinite(v))) {
